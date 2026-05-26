@@ -4,6 +4,42 @@ const router   = express.Router();
 
 const PIXABAY_KEY = process.env.PIXABAY_KEY;
 
+// Mapeamento: nome PT → termos de busca corretos (Wikipedia + Pixabay em inglês)
+const MAPA_BUSCA = {
+  'pão francês':             { wiki: { lang: 'pt', titulo: 'Pão francês' },          pixabay: 'french bread roll' },
+  'pão de queijo':           { wiki: { lang: 'pt', titulo: 'Pão de queijo' },         pixabay: 'pao de queijo cheese bread' },
+  'pão integral':            { wiki: { lang: 'en', titulo: 'Whole wheat bread' },     pixabay: 'whole wheat bread loaf' },
+  'pão de forma':            { wiki: { lang: 'en', titulo: 'Sliced bread' },          pixabay: 'sliced white bread loaf' },
+  'pão sírio':               { wiki: { lang: 'en', titulo: 'Pita' },                  pixabay: 'pita bread flatbread' },
+  'pão de hot dog':          { wiki: { lang: 'en', titulo: 'Hot dog bun' },           pixabay: 'hot dog bun bread' },
+  'pão de hambúrguer':       { wiki: { lang: 'en', titulo: 'Hamburger' },             pixabay: 'hamburger bun sesame bread' },
+  'baguete':                 { wiki: { lang: 'pt', titulo: 'Baguete' },               pixabay: 'baguette french bread' },
+  'croissant':               { wiki: { lang: 'en', titulo: 'Croissant' },             pixabay: 'croissant pastry butter' },
+  'rosca doce':              { wiki: { lang: 'en', titulo: 'Cinnamon roll' },         pixabay: 'sweet bread ring cinnamon roll' },
+  'broa de milho':           { wiki: { lang: 'en', titulo: 'Cornbread' },             pixabay: 'cornbread corn bread' },
+  'pão de batata':           { wiki: { lang: 'en', titulo: 'Potato bread' },          pixabay: 'potato bread soft roll' },
+  'pão sovado':              { wiki: { lang: 'en', titulo: 'Bread roll' },            pixabay: 'soft white bread roll' },
+  'pão de leite':            { wiki: { lang: 'en', titulo: 'Milk bread' },            pixabay: 'milk bread soft japanese' },
+  'coxinha':                 { wiki: { lang: 'pt', titulo: 'Coxinha' },               pixabay: 'coxinha brazilian snack fried' },
+  'empada':                  { wiki: { lang: 'pt', titulo: 'Empada' },                pixabay: 'empanada small pie pastry' },
+  'esfiha':                  { wiki: { lang: 'pt', titulo: 'Esfiha' },                pixabay: 'sfiha meat pastry arabic' },
+  'quibe':                   { wiki: { lang: 'en', titulo: 'Kibbeh' },                pixabay: 'kibbeh fried meat' },
+  'pastel':                  { wiki: { lang: 'pt', titulo: 'Pastel (culinária)' },    pixabay: 'pastel fried pastry brazilian' },
+  'enroladinho de salsicha': { wiki: { lang: 'en', titulo: 'Sausage roll' },          pixabay: 'sausage roll bread pastry' },
+  'pão de batata recheado':  { wiki: { lang: 'en', titulo: 'Stuffed bread' },         pixabay: 'stuffed bread roll filled' },
+  'torta salgada':           { wiki: { lang: 'en', titulo: 'Quiche' },                pixabay: 'savory pie slice quiche' },
+  'bolo de chocolate':       { wiki: { lang: 'en', titulo: 'Chocolate cake' },        pixabay: 'chocolate cake slice' },
+  'bolo de cenoura':         { wiki: { lang: 'pt', titulo: 'Bolo de cenoura' },       pixabay: 'carrot cake slice' },
+  'bolo de laranja':         { wiki: { lang: 'en', titulo: 'Orange cake' },           pixabay: 'orange cake homemade' },
+  'bolo de fubá':            { wiki: { lang: 'pt', titulo: 'Bolo de fubá' },          pixabay: 'cornmeal cake yellow fuba' },
+  'bolo de coco':            { wiki: { lang: 'en', titulo: 'Coconut cake' },          pixabay: 'coconut cake white shredded' },
+  'sonho':                   { wiki: { lang: 'en', titulo: 'Berliner (pastry)' },     pixabay: 'berliner doughnut cream filled' },
+  'brigadeiro':              { wiki: { lang: 'pt', titulo: 'Brigadeiro' },            pixabay: 'brigadeiro chocolate brazilian sweet' },
+  'palha italiana':          { wiki: { lang: 'pt', titulo: 'Palha italiana' },        pixabay: 'chocolate fudge square brownie' },
+  'pão de mel':              { wiki: { lang: 'pt', titulo: 'Pão de mel' },            pixabay: 'honey cake chocolate coated' },
+  'cuca':                    { wiki: { lang: 'en', titulo: 'Streuselkuchen' },        pixabay: 'streusel cake crumb topping' },
+};
+
 // Busca imagem principal de um artigo do Wikipedia
 async function imgWikipedia(lang, titulo) {
   try {
@@ -242,21 +278,25 @@ router.get('/relatorio/exportar', autenticar, async (req, res) => {
 // ============================================================
 router.get('/imagens/buscar', autenticar, async (req, res) => {
   try {
-    const { q, wiki_lang, wiki_titulo } = req.query;
+    const { q } = req.query;
     if (!q) return res.status(400).json({ erro: 'Parâmetro q é obrigatório.' });
 
     const resultados = [];
 
-    // 1. Tenta Wikipedia se informado
-    if (wiki_lang && wiki_titulo) {
-      const url = await imgWikipedia(wiki_lang, wiki_titulo);
+    // Verifica se existe mapeamento específico para esse produto
+    const mapa = MAPA_BUSCA[q.toLowerCase().trim()];
+
+    // 1. Tenta Wikipedia (usa o artigo correto do mapeamento, se houver)
+    if (mapa?.wiki) {
+      const url = await imgWikipedia(mapa.wiki.lang, mapa.wiki.titulo);
       if (url) resultados.push(url);
     }
 
-    // 2. Complementa com Pixabay (até 4 imagens no total)
+    // 2. Complementa com Pixabay (usa termo em inglês do mapeamento, ou o nome original)
+    const termoBusca = mapa?.pixabay || q;
     const faltam = 4 - resultados.length;
     if (faltam > 0) {
-      const pixabayUrls = await imgPixabay(q, faltam + 1);
+      const pixabayUrls = await imgPixabay(termoBusca, faltam + 1);
       for (const url of pixabayUrls) {
         if (!resultados.includes(url)) resultados.push(url);
         if (resultados.length >= 4) break;
