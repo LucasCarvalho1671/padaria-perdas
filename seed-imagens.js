@@ -1,74 +1,99 @@
-// seed-imagens.js — Busca imagens do Wikipedia e salva nos produtos
+// seed-imagens.js — Busca imagens no Wikimedia Commons e salva nos produtos
 // Rodar com: node seed-imagens.js
 // Requer Node.js 18+ (fetch nativo)
 
 require('dotenv').config();
 const db = require('./src/db/index');
 
-// Mapeamento: nome do produto → artigo no Wikipedia
-// lang: 'pt' = Wikipedia em português | 'en' = Wikipedia em inglês
+// Para cada produto: lista de termos de busca em ordem de preferência
+// O script tenta cada termo até achar uma foto real (jpg/png)
 const mapeamento = [
   // ── PÃES ──────────────────────────────────────────────────
-  { nome: 'Pão Francês',              lang: 'pt', titulo: 'Pão francês' },
-  { nome: 'Pão de Queijo',            lang: 'pt', titulo: 'Pão de queijo' },
-  { nome: 'Pão Integral',             lang: 'pt', titulo: 'Pão integral' },
-  { nome: 'Pão de Forma',             lang: 'pt', titulo: 'Pão de forma' },
-  { nome: 'Pão Sírio',                lang: 'pt', titulo: 'Pão sírio' },
-  { nome: 'Pão de Hot Dog',           lang: 'en', titulo: 'Hot dog bun' },
-  { nome: 'Pão de Hambúrguer',        lang: 'en', titulo: 'Hamburger bun' },
-  { nome: 'Baguete',                  lang: 'pt', titulo: 'Baguete' },
-  { nome: 'Croissant',                lang: 'pt', titulo: 'Croissant' },
-  { nome: 'Rosca Doce',               lang: 'pt', titulo: 'Rosca (alimento)' },
-  { nome: 'Broa de Milho',            lang: 'pt', titulo: 'Broa' },
-  { nome: 'Pão de Batata',            lang: 'pt', titulo: 'Pão de batata' },
-  { nome: 'Pão Sovado',               lang: 'pt', titulo: 'Pão sovado' },
-  { nome: 'Pão de Leite',             lang: 'pt', titulo: 'Pão de leite' },
+  { nome: 'Pão Francês',             termos: ['pão francês', 'french bread roll', 'dinner roll bread'] },
+  { nome: 'Pão de Queijo',           termos: ['pão de queijo', 'Brazilian cheese bread', 'cheese bread ball'] },
+  { nome: 'Pão Integral',            termos: ['whole wheat bread sliced', 'wholegrain bread'] },
+  { nome: 'Pão de Forma',            termos: ['sandwich bread loaf', 'sliced bread loaf'] },
+  { nome: 'Pão Sírio',               termos: ['pita bread', 'arabic flatbread'] },
+  { nome: 'Pão de Hot Dog',          termos: ['hot dog bun bread', 'hot dog roll'] },
+  { nome: 'Pão de Hambúrguer',       termos: ['hamburger bun bread', 'burger bun sesame'] },
+  { nome: 'Baguete',                 termos: ['baguette bread', 'french baguette'] },
+  { nome: 'Croissant',               termos: ['croissant pastry', 'croissant butter'] },
+  { nome: 'Rosca Doce',              termos: ['sweet bread ring rosca', 'sweet roll ring'] },
+  { nome: 'Broa de Milho',           termos: ['broa cornbread', 'corn bread loaf'] },
+  { nome: 'Pão de Batata',           termos: ['potato bread roll', 'pão de batata'] },
+  { nome: 'Pão Sovado',              termos: ['soft bread roll white', 'sweet bread roll'] },
+  { nome: 'Pão de Leite',            termos: ['milk bread roll', 'Japanese milk bread'] },
 
   // ── SALGADOS ──────────────────────────────────────────────
-  { nome: 'Coxinha',                  lang: 'pt', titulo: 'Coxinha' },
-  { nome: 'Empada',                   lang: 'pt', titulo: 'Empada' },
-  { nome: 'Esfiha',                   lang: 'pt', titulo: 'Esfiha' },
-  { nome: 'Quibe',                    lang: 'pt', titulo: 'Quibe' },
-  { nome: 'Pastel',                   lang: 'pt', titulo: 'Pastel (culinária)' },
-  { nome: 'Enroladinho de Salsicha',  lang: 'en', titulo: 'Pigs in blankets' },
-  { nome: 'Pão de Batata Recheado',   lang: 'pt', titulo: 'Pão de batata' },
-  { nome: 'Torta Salgada',            lang: 'pt', titulo: 'Torta salgada' },
+  { nome: 'Coxinha',                 termos: ['coxinha Brazilian', 'coxinha salgado'] },
+  { nome: 'Empada',                  termos: ['empada Brazilian pastry', 'empanada pie small'] },
+  { nome: 'Esfiha',                  termos: ['esfiha salgado', 'sfiha Lebanese pastry'] },
+  { nome: 'Quibe',                   termos: ['quibe frito', 'kibbeh fried'] },
+  { nome: 'Pastel',                  termos: ['pastel frito brasileiro', 'Brazilian pastel fried'] },
+  { nome: 'Enroladinho de Salsicha', termos: ['sausage roll pastry', 'pigs in blankets bread'] },
+  { nome: 'Pão de Batata Recheado',  termos: ['stuffed bread roll', 'recheado bread filled'] },
+  { nome: 'Torta Salgada',           termos: ['savory pie slice', 'torta salgada'] },
 
   // ── BOLOS E DOCES ─────────────────────────────────────────
-  { nome: 'Bolo de Chocolate',        lang: 'pt', titulo: 'Bolo de chocolate' },
-  { nome: 'Bolo de Cenoura',          lang: 'pt', titulo: 'Bolo de cenoura' },
-  { nome: 'Bolo de Laranja',          lang: 'en', titulo: 'Orange cake' },
-  { nome: 'Bolo de Fubá',             lang: 'pt', titulo: 'Bolo de fubá' },
-  { nome: 'Bolo de Coco',             lang: 'en', titulo: 'Coconut cake' },
-  { nome: 'Sonho',                    lang: 'en', titulo: 'Berliner (pastry)' },
-  { nome: 'Brigadeiro',               lang: 'pt', titulo: 'Brigadeiro' },
-  { nome: 'Palha Italiana',           lang: 'pt', titulo: 'Palha italiana' },
-  { nome: 'Pão de Mel',               lang: 'pt', titulo: 'Pão de mel' },
-  { nome: 'Cuca',                     lang: 'pt', titulo: 'Cuca (bolo)' },
+  { nome: 'Bolo de Chocolate',       termos: ['chocolate cake slice', 'chocolate layer cake'] },
+  { nome: 'Bolo de Cenoura',         termos: ['carrot cake slice', 'bolo cenoura chocolate'] },
+  { nome: 'Bolo de Laranja',         termos: ['orange cake', 'orange pound cake'] },
+  { nome: 'Bolo de Fubá',            termos: ['bolo fubá', 'cornmeal cake Brazilian'] },
+  { nome: 'Bolo de Coco',            termos: ['coconut cake slice', 'coconut layer cake'] },
+  { nome: 'Sonho',                   termos: ['berliner doughnut cream', 'filled doughnut jam'] },
+  { nome: 'Brigadeiro',              termos: ['brigadeiro chocolate Brazilian', 'brigadeiro sweet'] },
+  { nome: 'Palha Italiana',          termos: ['palha italiana Brazilian sweet', 'chocolate fudge cut'] },
+  { nome: 'Pão de Mel',              termos: ['pão de mel Brazilian', 'honey cake chocolate coated'] },
+  { nome: 'Cuca',                    termos: ['cuca bolo streusel', 'crumb cake German streusel'] },
 ];
 
-async function buscarImagemWikipedia(lang, titulo) {
-  try {
-    const url = `https://${lang}.wikipedia.org/w/api.php?` +
-      `action=query&titles=${encodeURIComponent(titulo)}` +
-      `&prop=pageimages&format=json&pithumbsize=400&origin=*`;
+// Busca imagem no Wikimedia Commons tentando cada termo em ordem
+async function buscarImagem(termos) {
+  for (const termo of termos) {
+    try {
+      const params = new URLSearchParams({
+        action:       'query',
+        generator:    'search',
+        gsrsearch:    termo,
+        gsrnamespace: 6,       // namespace 6 = arquivos (File:)
+        gsrlimit:     8,       // pega as 8 primeiras e filtra
+        prop:         'imageinfo',
+        iiprop:       'url|mime',
+        iiurlwidth:   400,
+        format:       'json',
+        origin:       '*',
+      });
 
-    const res  = await fetch(url);
-    const data = await res.json();
-    const pages = Object.values(data.query.pages);
-    return pages[0]?.thumbnail?.source || null;
-  } catch {
-    return null;
+      const res  = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`);
+      const data = await res.json();
+      const pages = Object.values(data?.query?.pages || {});
+
+      // Filtra apenas jpg/png (não svg, gif, webp ou pdf)
+      for (const page of pages) {
+        const info = page.imageinfo?.[0];
+        if (!info?.thumburl) continue;
+        const mime = info.mime || '';
+        if (mime.includes('jpeg') || mime.includes('png')) {
+          return info.thumburl;
+        }
+      }
+    } catch {
+      // Falhou nesse termo, tenta o próximo
+    }
+
+    // Pequena pausa entre buscas para não sobrecarregar a API
+    await new Promise(r => setTimeout(r, 400));
   }
+  return null;
 }
 
 (async () => {
-  console.log('🖼️  Buscando imagens do Wikipedia...\n');
+  console.log('🖼️  Buscando imagens no Wikimedia Commons...\n');
   let atualizados = 0;
   let semImagem   = 0;
 
   for (const item of mapeamento) {
-    const imgUrl = await buscarImagemWikipedia(item.lang, item.titulo);
+    const imgUrl = await buscarImagem(item.termos);
 
     if (imgUrl) {
       await db.query(
@@ -78,18 +103,16 @@ async function buscarImagemWikipedia(lang, titulo) {
       console.log(`  ✅ ${item.nome}`);
       atualizados++;
     } else {
-      console.log(`  ⚠️  ${item.nome} — imagem não encontrada no Wikipedia`);
+      console.log(`  ❌ ${item.nome} — não encontrado`);
       semImagem++;
     }
-
-    // Pequena pausa para não sobrecarregar a API do Wikipedia
-    await new Promise(r => setTimeout(r, 300));
   }
 
-  console.log(`\n🎉 Concluído!`);
+  console.log(`\n📊 Resultado:`);
   console.log(`   ✅ ${atualizados} produtos com imagem`);
+  console.log(`   ❌ ${semImagem} sem imagem`);
   if (semImagem > 0) {
-    console.log(`   ⚠️  ${semImagem} sem imagem — adicione manualmente pelo app`);
+    console.log(`\n💡 Para os que falharam, adicione a URL manualmente pelo app.`);
   }
   process.exit(0);
 })();
