@@ -1,6 +1,6 @@
 // seed-produtos.js — Cadastra produtos padrão de padaria
 // Rodar com: node seed-produtos.js
-// Pode rodar mais de uma vez sem duplicar (usa ON CONFLICT DO NOTHING)
+// Pode rodar mais de uma vez sem duplicar (requer sql/02_corrigir_duplicatas.sql aplicado)
 
 require('dotenv').config();
 const db = require('./src/db/index');
@@ -54,7 +54,7 @@ const produtos = [
       const { rowCount } = await db.query(
         `INSERT INTO produtos (nome, unidade)
          VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
+         ON CONFLICT (nome) DO NOTHING`,
         [p.nome, p.unidade]
       );
       if (rowCount > 0) {
