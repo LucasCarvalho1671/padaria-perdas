@@ -166,7 +166,9 @@ async function renderProducao(el) {
                 </td>
                 <td>${r.usuario_nome}</td>
                 <td>
-                  <button class="btn btn-perigo btn-sm" onclick="excluirProducao(${r.id})">✕</button>
+                  ${window.usuarioAtual?.role === 'admin'
+                    ? `<button class="btn btn-perigo btn-sm" onclick="excluirProducao(${r.id})">✕</button>`
+                    : ''}
                 </td>
               </tr>`).join('')}
           </tbody>

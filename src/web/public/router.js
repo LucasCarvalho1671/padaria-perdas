@@ -7,8 +7,8 @@ const rotas = {
   '/perdas':       { pagina: 'perdas',        titulo: 'Registrar Perda', render: (el) => renderPerdas(el) },
   '/producao':     { pagina: 'producao',      titulo: 'Produção',        render: (el) => renderProducao(el) },
   '/historico':    { pagina: 'historico',     titulo: 'Histórico',       render: (el) => renderHistorico(el) },
-  '/produtos':     { pagina: 'produtos',      titulo: 'Produtos',        render: (el) => renderProdutos(el) },
-  '/configuracoes':{ pagina: 'configuracoes', titulo: 'Configurações',   render: (el) => renderConfiguracoes(el) },
+  '/produtos':     { pagina: 'produtos',      titulo: 'Produtos',        render: (el) => renderProdutos(el),        apenasAdmin: true },
+  '/configuracoes':{ pagina: 'configuracoes', titulo: 'Configurações',   render: (el) => renderConfiguracoes(el),   apenasAdmin: true },
 };
 
 function navegar(caminho) {
@@ -18,6 +18,14 @@ function navegar(caminho) {
 
 function renderPagina(caminho) {
   const rota  = rotas[caminho] || rotas['/'];
+
+  // Redireciona funcionários que tentarem acessar páginas admin
+  if (rota.apenasAdmin && window.usuarioAtual?.role !== 'admin') {
+    history.replaceState({}, '', '/');
+    renderPagina('/');
+    return;
+  }
+
   const titulo = rota.titulo;
 
   // Atualiza título do topbar

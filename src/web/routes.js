@@ -93,7 +93,7 @@ function gerarCSV(colunas, linhas) {
   const corpo  = linhas.map(l => colunas.map(c => escapar(l[c])).join(SEP)).join('\r\n');
   return '﻿' + header + '\r\n' + corpo; // BOM + CRLF para Excel reconhecer UTF-8
 }
-const { autenticar } = require('./auth');
+const { autenticar, apenasAdmin } = require('./auth');
 const { erroInterno } = require('../utils/helpers');
 
 const dbProdutos = require('../db/produtos');
@@ -113,7 +113,7 @@ router.get('/produtos', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'GET /produtos'); }
 });
 
-router.post('/produtos', autenticar, async (req, res) => {
+router.post('/produtos', autenticar, apenasAdmin, async (req, res) => {
   try {
     const { nome, unidade, custo, imagem_url } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
@@ -122,7 +122,7 @@ router.post('/produtos', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'POST /produtos'); }
 });
 
-router.put('/produtos/:id', autenticar, async (req, res) => {
+router.put('/produtos/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     const produto = await dbProdutos.atualizar(req.params.id, req.body);
     if (!produto) return res.status(404).json({ erro: 'Produto não encontrado.' });
@@ -130,7 +130,7 @@ router.put('/produtos/:id', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'PUT /produtos'); }
 });
 
-router.delete('/produtos/:id', autenticar, async (req, res) => {
+router.delete('/produtos/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     await dbProdutos.excluir(req.params.id);
     res.json({ ok: true });
@@ -153,7 +153,7 @@ router.get('/motivos', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'GET /motivos'); }
 });
 
-router.post('/motivos', autenticar, async (req, res) => {
+router.post('/motivos', autenticar, apenasAdmin, async (req, res) => {
   try {
     const { nome } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
@@ -162,7 +162,7 @@ router.post('/motivos', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'POST /motivos'); }
 });
 
-router.put('/motivos/:id', autenticar, async (req, res) => {
+router.put('/motivos/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     const motivo = await dbMotivos.atualizar(req.params.id, req.body);
     if (!motivo) return res.status(404).json({ erro: 'Motivo não encontrado.' });
@@ -170,7 +170,7 @@ router.put('/motivos/:id', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'PUT /motivos'); }
 });
 
-router.delete('/motivos/:id', autenticar, async (req, res) => {
+router.delete('/motivos/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     await dbMotivos.excluir(req.params.id);
     res.json({ ok: true });
@@ -212,7 +212,7 @@ router.post('/perdas', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'POST /perdas'); }
 });
 
-router.delete('/perdas/:id', autenticar, async (req, res) => {
+router.delete('/perdas/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     await dbPerdas.excluir(req.params.id);
     res.json({ ok: true });
@@ -243,7 +243,7 @@ router.post('/producao', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'POST /producao'); }
 });
 
-router.delete('/producao/:id', autenticar, async (req, res) => {
+router.delete('/producao/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     await dbProducao.excluir(req.params.id);
     res.json({ ok: true });
@@ -349,14 +349,14 @@ router.get('/imagens/buscar', autenticar, async (req, res) => {
 // ============================================================
 // USUÁRIOS
 // ============================================================
-router.get('/usuarios', autenticar, async (req, res) => {
+router.get('/usuarios', autenticar, apenasAdmin, async (req, res) => {
   try {
     const lista = await dbUsuarios.listar();
     res.json(lista);
   } catch (err) { erroInterno(res, err, 'GET /usuarios'); }
 });
 
-router.post('/usuarios', autenticar, async (req, res) => {
+router.post('/usuarios', autenticar, apenasAdmin, async (req, res) => {
   try {
     const { nome, email, senha, role } = req.body;
     if (!nome || !email || !senha) {
@@ -371,7 +371,7 @@ router.post('/usuarios', autenticar, async (req, res) => {
   }
 });
 
-router.delete('/usuarios/:id', autenticar, async (req, res) => {
+router.delete('/usuarios/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     await dbUsuarios.excluir(req.params.id);
     res.json({ ok: true });
@@ -383,7 +383,7 @@ router.delete('/usuarios/:id', autenticar, async (req, res) => {
   }
 });
 
-router.put('/usuarios/:id', autenticar, async (req, res) => {
+router.put('/usuarios/:id', autenticar, apenasAdmin, async (req, res) => {
   try {
     const usuario = await dbUsuarios.atualizar(req.params.id, req.body);
     if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado.' });

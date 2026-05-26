@@ -23,8 +23,8 @@
       <li><a href="/perdas" data-page="perdas"   class="menu-item">📋 Registrar Perda</a></li>
       <li><a href="/producao" data-page="producao" class="menu-item">🏭 Produção</a></li>
       <li><a href="/historico" data-page="historico" class="menu-item">📂 Histórico</a></li>
-      <li><a href="/produtos" data-page="produtos"  class="menu-item">🥖 Produtos</a></li>
-      <li><a href="/configuracoes" data-page="configuracoes" class="menu-item">⚙️ Configurações</a></li>
+      <li data-admin><a href="/produtos" data-page="produtos"  class="menu-item">🥖 Produtos</a></li>
+      <li data-admin><a href="/configuracoes" data-page="configuracoes" class="menu-item">⚙️ Configurações</a></li>
     </ul>
     <div class="sidebar-footer">
       <span id="sidebar-usuario"></span>
@@ -61,7 +61,14 @@
         const res = await fetch('/api/auth/me');
         if (!res.ok) { window.location.href = '/login.html'; return; }
         const usuario = await res.json();
+        window.usuarioAtual = usuario; // disponível globalmente para as páginas
         document.getElementById('sidebar-usuario').textContent = usuario.nome;
+
+        // Esconde itens de menu exclusivos de admin para funcionários
+        if (usuario.role !== 'admin') {
+          document.querySelectorAll('[data-admin]').forEach(el => el.style.display = 'none');
+        }
+
         initRouter();
       } catch {
         window.location.href = '/login.html';

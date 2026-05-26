@@ -56,4 +56,12 @@ router.get('/me', autenticar, async (req, res) => {
   res.json(usuario);
 });
 
-module.exports = { router, autenticar };
+// Middleware: bloqueia quem não é admin
+function apenasAdmin(req, res, next) {
+  if (req.usuario?.role !== 'admin') {
+    return res.status(403).json({ erro: 'Acesso restrito a administradores.' });
+  }
+  next();
+}
+
+module.exports = { router, autenticar, apenasAdmin };

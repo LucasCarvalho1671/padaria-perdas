@@ -91,7 +91,9 @@ async function renderHistorico(el) {
                 <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.observacao || '—'}</td>
                 <td>${p.usuario_nome}</td>
                 <td>
-                  <button class="btn btn-perigo btn-sm" onclick="excluirPerda(${p.id})">✕</button>
+                  ${window.usuarioAtual?.role === 'admin'
+                    ? `<button class="btn btn-perigo btn-sm" onclick="excluirPerda(${p.id})">✕</button>`
+                    : ''}
                 </td>
               </tr>`).join('')}
           </tbody>
