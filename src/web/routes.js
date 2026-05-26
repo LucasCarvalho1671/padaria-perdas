@@ -1,7 +1,19 @@
 const express  = require('express');
 const bcrypt   = require('bcrypt');
-const XLSX     = require('xlsx');
 const router   = express.Router();
+
+// Gera CSV sem dependências externas — Excel abre normalmente
+function gerarCSV(colunas, linhas) {
+  const escapar = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = colunas.map(escapar).join(',');
+  const corpo  = linhas.map(l => colunas.map(c => escapar(l[c])).join(',')).join('\n');
+  return '﻿' + header + '\n' + corpo; // ﻿ = BOM para Excel reconhecer UTF-8
+}
 const { autenticar } = require('./auth');
 const { erroInterno } = require('../utils/helpers');
 
@@ -149,42 +161,48 @@ router.get('/dashboard', autenticar, async (req, res) => {
 });
 
 // ============================================================
-// RELATÓRIO — exportar para planilha Excel
+// RELATÓRIO — exportar para CSV (abre direto no Excel)
 // ============================================================
 router.get('/relatorio/exportar', autenticar, async (req, res) => {
   try {
-    const { dataInicio, dataFim } = req.query;
-    const perdas   = await dbPerdas.listar({ dataInicio, dataFim });
-    const producao = await dbProducao.listar({ dataInicio, dataFim });
+    const { dataInicio, dataFim, tipo = 'perdas' } = req.query;
 
-    const wbPerdas = perdas.map(p => ({
-      Data:       p.data,
-      Produto:    p.produto_nome,
-      Unidade:    p.unidade,
-      Quantidade: Number(p.quantidade),
-      'Valor (R$)': p.valor_total ? Number(p.valor_total) : '',
-      Motivo:     p.motivo_nome,
-      Observação: p.observacao || '',
-      Registrado: p.usuario_nome,
-    }));
+    let csv, nomeArquivo;
 
-    const wbProducao = producao.map(p => ({
-      Data:       p.data,
-      Produto:    p.produto_nome,
-      Unidade:    p.unidade,
-      Quantidade: Number(p.quantidade),
-      Observação: p.observacao || '',
-      Registrado: p.usuario_nome,
-    }));
+    if (tipo === 'producao') {
+      const producao = await dbProducao.listar({ dataInicio, dataFim });
+      const colunas  = ['data', 'produto_nome', 'unidade', 'quantidade', 'observacao', 'usuario_nome'];
+      const linhas   = producao.map(p => ({
+        data:          p.data,
+        produto_nome:  p.produto_nome,
+        unidade:       p.unidade,
+        quantidade:    Number(p.quantidade),
+        observacao:    p.observacao || '',
+        usuario_nome:  p.usuario_nome,
+      }));
+      csv = gerarCSV(['Data', 'Produto', 'Unidade', 'Quantidade', 'Observação', 'Registrado por'], linhas.map(l =>
+        ({ Data: l.data, Produto: l.produto_nome, Unidade: l.unidade, Quantidade: l.quantidade, 'Observação': l.observacao, 'Registrado por': l.usuario_nome })
+      ));
+      nomeArquivo = 'producao-padaria.csv';
+    } else {
+      const perdas  = await dbPerdas.listar({ dataInicio, dataFim });
+      const linhas  = perdas.map(p => ({
+        Data:          p.data,
+        Produto:       p.produto_nome,
+        Unidade:       p.unidade,
+        Quantidade:    Number(p.quantidade),
+        'Valor (R$)':  p.valor_total ? Number(p.valor_total).toFixed(2) : '',
+        Motivo:        p.motivo_nome,
+        'Observação':  p.observacao || '',
+        'Registrado por': p.usuario_nome,
+      }));
+      csv = gerarCSV(['Data','Produto','Unidade','Quantidade','Valor (R$)','Motivo','Observação','Registrado por'], linhas);
+      nomeArquivo = 'perdas-padaria.csv';
+    }
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wbPerdas),   'Perdas');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wbProducao), 'Produção');
-
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    res.setHeader('Content-Disposition', 'attachment; filename="relatorio-padaria.xlsx"');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.send(csv);
   } catch (err) { erroInterno(res, err, 'GET /relatorio/exportar'); }
 });
 
