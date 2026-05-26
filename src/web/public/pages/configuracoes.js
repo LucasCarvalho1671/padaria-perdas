@@ -309,13 +309,18 @@ function fecharModalMotivo() {
 
 // ── Excluir motivo ───────────────────────────────────────────
 async function excluirMotivo(id, nome) {
-  if (!confirm(`Excluir o motivo "${nome}"?\n\nSe ele já foi usado em alguma perda registrada, não será possível excluir — apenas inativar.`)) return;
+  const ok = await confirmar(
+    `Excluir o motivo <strong>"${nome}"</strong>?<br><br>
+     Se ele já foi usado em alguma perda registrada, não será possível excluir — use <strong>Editar → Inativo</strong> em vez disso.`,
+    { okTexto: '🗑️ Excluir', okClasse: 'btn-perigo' }
+  );
+  if (!ok) return;
   try {
     const res  = await fetch(`/api/motivos/${id}`, { method: 'DELETE' });
     const data = await res.json();
-    if (!res.ok) { alert(data.erro); return; }
+    if (!res.ok) { await alertar(data.erro); return; }
     renderConfiguracoes(document.getElementById('conteudo'));
   } catch (err) {
-    alert('Erro ao excluir: ' + err.message);
+    await alertar('Erro ao excluir: ' + err.message);
   }
 }

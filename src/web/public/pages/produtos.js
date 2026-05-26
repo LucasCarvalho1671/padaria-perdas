@@ -307,13 +307,18 @@ function fecharModal() {
 }
 
 async function excluirProduto(id, nome) {
-  if (!confirm(`Excluir o produto "${nome}"?\n\nSe ele já possui perdas ou produções registradas, não será possível excluir — use "Editar" e mude a situação para Inativo.`)) return;
+  const ok = await confirmar(
+    `Excluir o produto <strong>"${nome}"</strong>?<br><br>
+     Se ele já possui perdas ou produções registradas, não será possível excluir — use <strong>Editar → Inativo</strong> em vez disso.`,
+    { okTexto: '🗑️ Excluir', okClasse: 'btn-perigo' }
+  );
+  if (!ok) return;
   try {
     const res  = await fetch(`/api/produtos/${id}`, { method: 'DELETE' });
     const data = await res.json();
-    if (!res.ok) { alert(data.erro); return; }
+    if (!res.ok) { await alertar(data.erro); return; }
     renderProdutos(document.getElementById('conteudo'));
   } catch (err) {
-    alert('Erro ao excluir: ' + err.message);
+    await alertar('Erro ao excluir: ' + err.message);
   }
 }

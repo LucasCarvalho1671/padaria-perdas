@@ -345,6 +345,49 @@ tr:hover td { background: #fafafa; }
   letter-spacing: .04em;
 }
 
+/* ── DIALOG CUSTOMIZADO ──────────────────────────────────── */
+.dialog-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 900;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.dialog-overlay.aberto { display: flex; }
+
+.dialog-box {
+  background: white;
+  border-radius: var(--raio);
+  padding: 2rem 1.75rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  text-align: center;
+  animation: dialog-entrar .18s ease;
+}
+
+@keyframes dialog-entrar {
+  from { opacity: 0; transform: scale(.94) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+.dialog-icone   { font-size: 2.5rem; margin-bottom: .75rem; }
+.dialog-mensagem {
+  font-size: .95rem;
+  color: var(--cor-texto);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.dialog-botoes {
+  display: flex;
+  gap: .75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 /* ── SELETOR DE IMAGENS ──────────────────────────────────── */
 .img-picker-modal {
   display: none;
