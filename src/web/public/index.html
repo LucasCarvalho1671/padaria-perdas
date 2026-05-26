@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Padaria Perdas</title>
+  <link rel="stylesheet" href="/app.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#c8622a" />
+</head>
+<body>
+
+  <!-- SIDEBAR / MENU LATERAL -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">🍞</span>
+      <span class="sidebar-titulo">Padaria Perdas</span>
+      <button class="sidebar-fechar" id="btn-fechar-menu">✕</button>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="/" data-page="dashboard"     class="menu-item">📊 Dashboard</a></li>
+      <li><a href="/perdas" data-page="perdas"   class="menu-item">📋 Registrar Perda</a></li>
+      <li><a href="/producao" data-page="producao" class="menu-item">🏭 Produção</a></li>
+      <li><a href="/historico" data-page="historico" class="menu-item">📂 Histórico</a></li>
+      <li><a href="/produtos" data-page="produtos"  class="menu-item">🥖 Produtos</a></li>
+      <li><a href="/configuracoes" data-page="configuracoes" class="menu-item">⚙️ Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <span id="sidebar-usuario"></span>
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </nav>
+
+  <!-- OVERLAY escuro ao abrir menu no mobile -->
+  <div class="overlay" id="overlay"></div>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <button class="btn-menu" id="btn-abrir-menu">☰</button>
+      <h2 class="topbar-titulo" id="topbar-titulo">Dashboard</h2>
+    </header>
+    <main class="conteudo" id="conteudo">
+      <div class="carregando">Carregando...</div>
+    </main>
+  </div>
+
+  <script src="/router.js"></script>
+  <script src="/pages/dashboard.js"></script>
+  <script src="/pages/perdas.js"></script>
+  <script src="/pages/producao.js"></script>
+  <script src="/pages/historico.js"></script>
+  <script src="/pages/produtos.js"></script>
+  <script src="/pages/configuracoes.js"></script>
+  <script>
+    // ── Verificar autenticação ──────────────────────────────
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) { window.location.href = '/login.html'; return; }
+        const usuario = await res.json();
+        document.getElementById('sidebar-usuario').textContent = usuario.nome;
+        initRouter();
+      } catch {
+        window.location.href = '/login.html';
+      }
+    })();
+
+    // ── Menu mobile ─────────────────────────────────────────
+    const sidebar  = document.getElementById('sidebar');
+    const overlay  = document.getElementById('overlay');
+    document.getElementById('btn-abrir-menu').onclick = () => {
+      sidebar.classList.add('aberto');
+      overlay.classList.add('visivel');
+    };
+    document.getElementById('btn-fechar-menu').onclick =
+    overlay.onclick = () => {
+      sidebar.classList.remove('aberto');
+      overlay.classList.remove('visivel');
+    };
+
+    // ── Logout ───────────────────────────────────────────────
+    document.getElementById('btn-logout').onclick = async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    };
+  </script>
+</body>
+</html>
