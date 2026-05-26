@@ -1,9 +1,9 @@
 const db = require('./index');
 
-async function criar({ nome, email, senha }) {
+async function criar({ nome, email, senha, role = 'funcionario' }) {
   const { rows } = await db.query(
-    `INSERT INTO usuarios (nome, email, senha) VALUES ($1, $2, $3) RETURNING id, nome, email, role`,
-    [nome, email, senha]
+    `INSERT INTO usuarios (nome, email, senha, role) VALUES ($1, $2, $3, $4) RETURNING id, nome, email, role`,
+    [nome, email, senha, role]
   );
   return rows[0];
 }

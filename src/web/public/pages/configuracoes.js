@@ -91,6 +91,13 @@ async function renderConfiguracoes(el) {
             <label>Senha *</label>
             <input type="password" id="u-senha" placeholder="Mínimo 6 caracteres" required minlength="6" />
           </div>
+          <div class="campo">
+            <label>Perfil</label>
+            <select id="u-role">
+              <option value="funcionario">Funcionário</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
           <button type="submit" class="btn btn-primario" id="btn-salvar-usuario">
             Adicionar Usuário
           </button>
@@ -177,6 +184,7 @@ async function renderConfiguracoes(el) {
             nome:  document.getElementById('u-nome').value,
             email: document.getElementById('u-email').value,
             senha: document.getElementById('u-senha').value,
+            role:  document.getElementById('u-role').value,
           }),
         });
         const data = await res.json();

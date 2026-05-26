@@ -358,12 +358,12 @@ router.get('/usuarios', autenticar, async (req, res) => {
 
 router.post('/usuarios', autenticar, async (req, res) => {
   try {
-    const { nome, email, senha } = req.body;
+    const { nome, email, senha, role } = req.body;
     if (!nome || !email || !senha) {
       return res.status(400).json({ erro: 'Nome, email e senha são obrigatórios.' });
     }
     const senhaHash = await bcrypt.hash(senha, 10);
-    const usuario = await dbUsuarios.criar({ nome, email, senha: senhaHash });
+    const usuario = await dbUsuarios.criar({ nome, email, senha: senhaHash, role });
     res.status(201).json(usuario);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ erro: 'Este email já está cadastrado.' });
