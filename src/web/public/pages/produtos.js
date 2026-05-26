@@ -1,12 +1,79 @@
+// ── Seletor de imagens global ─────────────────────────────
+// Abre modal com opções de imagem buscadas no Wikipedia + Pixabay
+// campoId: id do <input> que vai receber a URL escolhida
+// previewId: id do elemento que mostra o preview
+async function abrirSeletorImagens(nomeProduto, campoId, previewId) {
+  const modal = document.getElementById('img-picker-modal');
+  const grid  = document.getElementById('img-picker-grid');
+  const titulo = document.getElementById('img-picker-titulo');
+
+  titulo.textContent  = `Escolha uma imagem para: ${nomeProduto}`;
+  grid.innerHTML      = '<div class="img-picker-vazio">🔍 Buscando imagens...</div>';
+  modal.classList.add('aberto');
+
+  try {
+    const params = new URLSearchParams({ q: nomeProduto });
+    const res    = await fetch(`/api/imagens/buscar?${params}`);
+    const data   = await res.json();
+
+    if (!data.imagens?.length) {
+      grid.innerHTML = '<div class="img-picker-vazio">Nenhuma imagem encontrada.<br>Tente digitar a URL manualmente.</div>';
+      return;
+    }
+
+    grid.innerHTML = data.imagens.map((url, i) => `
+      <div class="img-picker-opcao" onclick="selecionarImagem('${url}', '${campoId}', '${previewId}')">
+        <img src="${url}" alt="Opção ${i + 1}"
+             onerror="this.closest('.img-picker-opcao').style.display='none'" />
+      </div>
+    `).join('');
+  } catch {
+    grid.innerHTML = '<div class="img-picker-vazio">Erro ao buscar imagens. Tente novamente.</div>';
+  }
+
+  // Guarda referência para fechar e limpar
+  modal._campoId   = campoId;
+  modal._previewId = previewId;
+}
+
+function selecionarImagem(url, campoId, previewId) {
+  document.getElementById(campoId).value = url;
+  atualizarPreview(url, previewId);
+  fecharSeletorImagens();
+}
+
+function fecharSeletorImagens() {
+  document.getElementById('img-picker-modal').classList.remove('aberto');
+}
+
+function atualizarPreview(url, previewId) {
+  const el = document.getElementById(previewId);
+  if (!el) return;
+  el.innerHTML = url
+    ? `<img src="${url}" style="max-height:80px;border-radius:6px;border:1px solid #eee;margin-top:.4rem"
+         onerror="this.style.display='none'" />`
+    : '';
+}
+
+// ── Tela de Produtos ──────────────────────────────────────
 async function renderProdutos(el) {
   el.innerHTML = '<div class="carregando">Carregando...</div>';
   try {
     const produtos = await fetch('/api/produtos').then(r => r.json());
 
     el.innerHTML = `
+      <!-- Modal seletor de imagens -->
+      <div id="img-picker-modal" class="img-picker-modal">
+        <div class="img-picker-box">
+          <div id="img-picker-titulo" class="img-picker-titulo"></div>
+          <div id="img-picker-grid" class="img-picker-grid"></div>
+          <button class="btn btn-secundario" onclick="fecharSeletorImagens()">Cancelar</button>
+        </div>
+      </div>
+
       <!-- Modal de edição -->
       <div id="modal-produto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
-        <div class="card" style="width:100%;max-width:480px;margin:1rem">
+        <div class="card" style="width:100%;max-width:480px;margin:1rem;max-height:90vh;overflow-y:auto">
           <div class="secao-titulo">✏️ Editar produto</div>
           <div id="alerta-edit"></div>
           <form id="form-editar">
@@ -33,9 +100,15 @@ async function renderProdutos(el) {
               <input type="number" id="edit-custo" min="0" step="0.01" placeholder="Ex: 0.80" />
             </div>
             <div class="campo">
-              <label>URL da imagem de referência <small style="color:#999">— opcional</small></label>
-              <input type="url" id="edit-imagem" placeholder="https://..." />
-              <div id="edit-preview" style="margin-top:.5rem"></div>
+              <label>Imagem de referência</label>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <input type="url" id="edit-imagem" placeholder="https://..." style="flex:1" />
+                <button type="button" class="btn btn-secundario btn-sm"
+                  onclick="abrirSeletorImagens(document.getElementById('edit-nome').value || 'produto', 'edit-imagem', 'edit-preview')">
+                  🔍 Buscar
+                </button>
+              </div>
+              <div id="edit-preview" style="margin-top:.4rem"></div>
             </div>
             <div class="campo">
               <label>Situação</label>
@@ -79,8 +152,15 @@ async function renderProdutos(el) {
             <input type="number" id="pd-custo" min="0" step="0.01" placeholder="Ex: 0.80" />
           </div>
           <div class="campo">
-            <label>URL da imagem de referência <small style="color:#999">— opcional</small></label>
-            <input type="url" id="pd-imagem" placeholder="https://..." />
+            <label>Imagem de referência <small style="color:#999">— opcional</small></label>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <input type="url" id="pd-imagem" placeholder="https://..." style="flex:1" />
+              <button type="button" class="btn btn-secundario btn-sm"
+                onclick="abrirSeletorImagens(document.getElementById('pd-nome').value || 'produto', 'pd-imagem', 'pd-preview')">
+                🔍 Buscar
+              </button>
+            </div>
+            <div id="pd-preview"></div>
           </div>
           <button type="submit" class="btn btn-primario btn-block" id="btn-salvar-pd">
             Cadastrar Produto
@@ -96,14 +176,7 @@ async function renderProdutos(el) {
             ? '<div class="vazio">Nenhum produto cadastrado.</div>'
             : `<table>
                 <thead>
-                  <tr>
-                    <th></th>
-                    <th>Nome</th>
-                    <th>Unidade</th>
-                    <th>Custo</th>
-                    <th>Situação</th>
-                    <th></th>
-                  </tr>
+                  <tr><th></th><th>Nome</th><th>Unidade</th><th>Custo</th><th>Situação</th><th></th></tr>
                 </thead>
                 <tbody>
                   ${produtos.map(p => `
@@ -115,18 +188,11 @@ async function renderProdutos(el) {
                       </td>
                       <td>${p.nome}</td>
                       <td>${p.unidade}</td>
-                      <td>${p.custo
-                            ? 'R$ ' + Number(p.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-                            : '<span style="color:#bbb">—</span>'}</td>
+                      <td>${p.custo ? 'R$ ' + Number(p.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span style="color:#bbb">—</span>'}</td>
+                      <td><span class="badge ${p.ativo ? 'badge-verde' : 'badge-cinza'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td>
                       <td>
-                        <span class="badge ${p.ativo ? 'badge-verde' : 'badge-cinza'}">
-                          ${p.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          class="btn btn-secundario btn-sm"
-                          onclick="abrirEdicao(${p.id}, '${p.nome.replace(/'/g, "\\'")}', '${p.unidade}', '${p.custo || ''}', '${p.imagem_url || ''}', ${p.ativo})">
+                        <button class="btn btn-secundario btn-sm"
+                          onclick="abrirEdicao(${p.id}, '${p.nome.replace(/'/g, "\\'")}', '${p.unidade}', '${p.custo || ''}', '${(p.imagem_url || '').replace(/'/g, "\\'")}', ${p.ativo})">
                           ✏️ Editar
                         </button>
                       </td>
@@ -137,6 +203,16 @@ async function renderProdutos(el) {
       </div>
     `;
 
+    // ── Preview ao digitar URL no cadastro ────────────────────
+    document.getElementById('pd-imagem').addEventListener('input', (e) => {
+      atualizarPreview(e.target.value.trim(), 'pd-preview');
+    });
+
+    // ── Preview ao digitar URL na edição ─────────────────────
+    document.getElementById('edit-imagem').addEventListener('input', (e) => {
+      atualizarPreview(e.target.value.trim(), 'edit-preview');
+    });
+
     // ── Cadastrar novo produto ────────────────────────────────
     document.getElementById('form-produto').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -145,11 +221,9 @@ async function renderProdutos(el) {
       alerta.innerHTML = '';
       btn.disabled = true;
       btn.textContent = 'Salvando...';
-
       try {
         const res = await fetch('/api/produtos', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nome:       document.getElementById('pd-nome').value,
             unidade:    document.getElementById('pd-unidade').value,
@@ -159,7 +233,6 @@ async function renderProdutos(el) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.erro);
-
         alerta.innerHTML = '<div class="alerta alerta-sucesso">✅ Produto cadastrado!</div>';
         setTimeout(() => renderProdutos(document.getElementById('conteudo')), 1000);
       } catch (err) {
@@ -172,16 +245,6 @@ async function renderProdutos(el) {
     // ── Modal: cancelar ───────────────────────────────────────
     document.getElementById('btn-cancelar-edit').onclick = fecharModal;
 
-    // ── Modal: preview da imagem ao digitar URL ───────────────
-    document.getElementById('edit-imagem').addEventListener('input', (e) => {
-      const preview = document.getElementById('edit-preview');
-      const url = e.target.value.trim();
-      preview.innerHTML = url
-        ? `<img src="${url}" style="max-height:80px;border-radius:6px;border:1px solid #eee"
-             onerror="this.style.display='none'" />`
-        : '';
-    });
-
     // ── Modal: salvar edição ──────────────────────────────────
     document.getElementById('form-editar').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -190,12 +253,10 @@ async function renderProdutos(el) {
       alerta.innerHTML = '';
       btn.disabled = true;
       btn.textContent = 'Salvando...';
-
       try {
         const id  = document.getElementById('edit-id').value;
         const res = await fetch(`/api/produtos/${id}`, {
-          method:  'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nome:       document.getElementById('edit-nome').value,
             unidade:    document.getElementById('edit-unidade').value,
@@ -206,7 +267,6 @@ async function renderProdutos(el) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.erro);
-
         fecharModal();
         renderProdutos(document.getElementById('conteudo'));
       } catch (err) {
@@ -221,22 +281,16 @@ async function renderProdutos(el) {
   }
 }
 
-// Abre o modal preenchido com os dados do produto
+// ── Abre modal de edição preenchido ──────────────────────
 function abrirEdicao(id, nome, unidade, custo, imagem_url, ativo) {
-  document.getElementById('edit-id').value       = id;
-  document.getElementById('edit-nome').value     = nome;
-  document.getElementById('edit-unidade').value  = unidade;
-  document.getElementById('edit-custo').value    = custo || '';
-  document.getElementById('edit-imagem').value   = imagem_url || '';
-  document.getElementById('edit-ativo').value    = ativo ? 'true' : 'false';
+  document.getElementById('edit-id').value      = id;
+  document.getElementById('edit-nome').value    = nome;
+  document.getElementById('edit-unidade').value = unidade;
+  document.getElementById('edit-custo').value   = custo || '';
+  document.getElementById('edit-imagem').value  = imagem_url || '';
+  document.getElementById('edit-ativo').value   = ativo ? 'true' : 'false';
   document.getElementById('alerta-edit').innerHTML = '';
-
-  // Preview da imagem já existente
-  const preview = document.getElementById('edit-preview');
-  preview.innerHTML = imagem_url
-    ? `<img src="${imagem_url}" style="max-height:80px;border-radius:6px;border:1px solid #eee"
-         onerror="this.style.display='none'" />`
-    : '';
+  atualizarPreview(imagem_url, 'edit-preview');
 
   const modal = document.getElementById('modal-produto');
   modal.style.display = 'flex';

@@ -2,6 +2,36 @@ const express  = require('express');
 const bcrypt   = require('bcrypt');
 const router   = express.Router();
 
+const PIXABAY_KEY = process.env.PIXABAY_KEY;
+
+// Busca imagem principal de um artigo do Wikipedia
+async function imgWikipedia(lang, titulo) {
+  try {
+    const res  = await fetch(
+      `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titulo)}`,
+      { headers: { 'User-Agent': 'padaria-perdas/1.0' } }
+    );
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d.thumbnail?.source || null;
+  } catch { return null; }
+}
+
+// Busca até N imagens no Pixabay
+async function imgPixabay(termo, quantidade = 4) {
+  if (!PIXABAY_KEY) return [];
+  try {
+    const params = new URLSearchParams({
+      key: PIXABAY_KEY, q: termo, image_type: 'photo',
+      category: 'food', per_page: quantidade,
+      safesearch: true, lang: 'en', min_width: 300,
+    });
+    const res  = await fetch(`https://pixabay.com/api/?${params}`);
+    const data = await res.json();
+    return (data.hits || []).map(h => h.webformatURL);
+  } catch { return []; }
+}
+
 // Gera CSV sem dependências externas — Excel abre normalmente
 function gerarCSV(colunas, linhas) {
   const escapar = (v) => {
@@ -204,6 +234,37 @@ router.get('/relatorio/exportar', autenticar, async (req, res) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.send(csv);
   } catch (err) { erroInterno(res, err, 'GET /relatorio/exportar'); }
+});
+
+// ============================================================
+// BUSCA DE IMAGENS — usado pelo seletor de imagens no cadastro
+// GET /api/imagens/buscar?q=pao+frances&wiki_lang=pt&wiki_titulo=Pão+francês
+// ============================================================
+router.get('/imagens/buscar', autenticar, async (req, res) => {
+  try {
+    const { q, wiki_lang, wiki_titulo } = req.query;
+    if (!q) return res.status(400).json({ erro: 'Parâmetro q é obrigatório.' });
+
+    const resultados = [];
+
+    // 1. Tenta Wikipedia se informado
+    if (wiki_lang && wiki_titulo) {
+      const url = await imgWikipedia(wiki_lang, wiki_titulo);
+      if (url) resultados.push(url);
+    }
+
+    // 2. Complementa com Pixabay (até 4 imagens no total)
+    const faltam = 4 - resultados.length;
+    if (faltam > 0) {
+      const pixabayUrls = await imgPixabay(q, faltam + 1);
+      for (const url of pixabayUrls) {
+        if (!resultados.includes(url)) resultados.push(url);
+        if (resultados.length >= 4) break;
+      }
+    }
+
+    res.json({ imagens: resultados });
+  } catch (err) { erroInterno(res, err, 'GET /imagens/buscar'); }
 });
 
 // ============================================================
