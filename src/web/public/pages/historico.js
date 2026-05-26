@@ -65,7 +65,12 @@ async function renderHistorico(el) {
 
       const fmt   = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 3 });
       const moeda = v => v == null ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-      const fmtData = d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
+      const fmtData = d => {
+        if (!d) return '—';
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return '—';
+        return dt.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+      };
 
       lista.innerHTML = `
         <table>
@@ -114,11 +119,12 @@ async function renderHistorico(el) {
 }
 
 async function excluirPerda(id) {
-  if (!confirm('Deseja excluir este registro?')) return;
+  const ok = await confirmar('Excluir este registro de perda?', { okTexto: '🗑️ Excluir', okClasse: 'btn-perigo' });
+  if (!ok) return;
   try {
     await fetch(`/api/perdas/${id}`, { method: 'DELETE' });
     renderHistorico(document.getElementById('conteudo'));
   } catch (err) {
-    alert('Erro ao excluir: ' + err.message);
+    await alertar('Erro ao excluir: ' + err.message);
   }
 }
