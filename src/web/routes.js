@@ -70,15 +70,17 @@ async function imgPixabay(termo, quantidade = 4) {
 
 // Gera CSV sem dependências externas — Excel abre normalmente
 function gerarCSV(colunas, linhas) {
+  // Separador ; porque no Excel brasileiro a vírgula é decimal (R$ 1,50)
+  const SEP = ';';
   const escapar = (v) => {
     if (v == null) return '';
     const s = String(v);
-    return s.includes(',') || s.includes('"') || s.includes('\n')
+    return s.includes(SEP) || s.includes('"') || s.includes('\n')
       ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const header = colunas.map(escapar).join(',');
-  const corpo  = linhas.map(l => colunas.map(c => escapar(l[c])).join(',')).join('\r\n');
-  return '﻿' + header + '\r\n' + corpo; // BOM + CRLF para Excel reconhecer UTF-8 e quebrar linhas
+  const header = colunas.map(escapar).join(SEP);
+  const corpo  = linhas.map(l => colunas.map(c => escapar(l[c])).join(SEP)).join('\r\n');
+  return '﻿' + header + '\r\n' + corpo; // BOM + CRLF para Excel reconhecer UTF-8
 }
 const { autenticar } = require('./auth');
 const { erroInterno } = require('../utils/helpers');
