@@ -24,7 +24,11 @@ app.use(cookieParser());
 // ── Arquivos estáticos (frontend) ──────────────────────────
 app.use(express.static(path.join(__dirname, 'web', 'public')));
 
-// ── Rotas da API ───────────────────────────────────────────
+// ── Rotas da API (sem cache — evita problema do 304) ──────
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use('/api/auth', authRouter);
 app.use('/api',      apiRoutes);
 

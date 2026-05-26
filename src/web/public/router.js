@@ -1,11 +1,14 @@
 // Roteador SPA — troca de páginas sem recarregar o navegador
+// Arrow functions garantem que as funções de render só são buscadas
+// quando chamadas, não quando este arquivo carrega (os outros scripts
+// ainda não existem nesse momento).
 const rotas = {
-  '/':             { pagina: 'dashboard',      titulo: 'Dashboard',        render: renderDashboard },
-  '/perdas':       { pagina: 'perdas',         titulo: 'Registrar Perda',  render: renderPerdas },
-  '/producao':     { pagina: 'producao',       titulo: 'Produção',         render: renderProducao },
-  '/historico':    { pagina: 'historico',      titulo: 'Histórico',        render: renderHistorico },
-  '/produtos':     { pagina: 'produtos',       titulo: 'Produtos',         render: renderProdutos },
-  '/configuracoes':{ pagina: 'configuracoes',  titulo: 'Configurações',    render: renderConfiguracoes },
+  '/':             { pagina: 'dashboard',     titulo: 'Dashboard',       render: (el) => renderDashboard(el) },
+  '/perdas':       { pagina: 'perdas',        titulo: 'Registrar Perda', render: (el) => renderPerdas(el) },
+  '/producao':     { pagina: 'producao',      titulo: 'Produção',        render: (el) => renderProducao(el) },
+  '/historico':    { pagina: 'historico',     titulo: 'Histórico',       render: (el) => renderHistorico(el) },
+  '/produtos':     { pagina: 'produtos',      titulo: 'Produtos',        render: (el) => renderProdutos(el) },
+  '/configuracoes':{ pagina: 'configuracoes', titulo: 'Configurações',   render: (el) => renderConfiguracoes(el) },
 };
 
 function navegar(caminho) {
