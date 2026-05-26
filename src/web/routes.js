@@ -68,6 +68,17 @@ async function imgPixabay(termo, quantidade = 4) {
   } catch { return []; }
 }
 
+// Formata Date do PostgreSQL → DD/MM/AAAA (usa UTC para não deslocar por fuso)
+function formatarData(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return String(d);
+  const dia = String(dt.getUTCDate()).padStart(2, '0');
+  const mes = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const ano = dt.getUTCFullYear();
+  return `${dia}/${mes}/${ano}`;
+}
+
 // Gera CSV sem dependências externas — Excel abre normalmente
 function gerarCSV(colunas, linhas) {
   // Separador ; porque no Excel brasileiro a vírgula é decimal (R$ 1,50)
@@ -275,13 +286,13 @@ router.get('/relatorio/exportar', autenticar, async (req, res) => {
         usuario_nome:  p.usuario_nome,
       }));
       csv = gerarCSV(['Data', 'Produto', 'Unidade', 'Quantidade', 'Observação', 'Registrado por'], linhas.map(l =>
-        ({ Data: l.data, Produto: l.produto_nome, Unidade: l.unidade, Quantidade: l.quantidade, 'Observação': l.observacao, 'Registrado por': l.usuario_nome })
+        ({ Data: formatarData(l.data), Produto: l.produto_nome, Unidade: l.unidade, Quantidade: l.quantidade, 'Observação': l.observacao, 'Registrado por': l.usuario_nome })
       ));
       nomeArquivo = 'producao-padaria.csv';
     } else {
       const perdas  = await dbPerdas.listar({ dataInicio, dataFim });
       const linhas  = perdas.map(p => ({
-        Data:          p.data,
+        Data:          formatarData(p.data),
         Produto:       p.produto_nome,
         Unidade:       p.unidade,
         Quantidade:    Number(p.quantidade),
