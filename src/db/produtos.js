@@ -31,4 +31,8 @@ async function atualizar(id, { nome, unidade, custo, imagem_url, ativo }) {
   return rows[0] || null;
 }
 
-module.exports = { criar, listar, buscarPorId, atualizar };
+async function excluir(id) {
+  await db.query(`DELETE FROM produtos WHERE id = $1`, [id]);
+}
+
+module.exports = { criar, listar, buscarPorId, atualizar, excluir };

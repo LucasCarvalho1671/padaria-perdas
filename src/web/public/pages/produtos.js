@@ -59,7 +59,7 @@ function atualizarPreview(url, previewId) {
 async function renderProdutos(el) {
   el.innerHTML = '<div class="carregando">Carregando...</div>';
   try {
-    const produtos = await fetch('/api/produtos').then(r => r.json());
+    const produtos = await fetch('/api/produtos?todos=true').then(r => r.json());
 
     el.innerHTML = `
       <!-- Modal seletor de imagens -->
@@ -195,6 +195,10 @@ async function renderProdutos(el) {
                           onclick="abrirEdicao(${p.id}, '${p.nome.replace(/'/g, "\\'")}', '${p.unidade}', '${p.custo || ''}', '${(p.imagem_url || '').replace(/'/g, "\\'")}', ${p.ativo})">
                           ✏️ Editar
                         </button>
+                        <button class="btn btn-perigo btn-sm"
+                          onclick="excluirProduto(${p.id}, '${p.nome.replace(/'/g, "\\'")}')">
+                          🗑️
+                        </button>
                       </td>
                     </tr>`).join('')}
                 </tbody>
@@ -300,4 +304,16 @@ function abrirEdicao(id, nome, unidade, custo, imagem_url, ativo) {
 
 function fecharModal() {
   document.getElementById('modal-produto').style.display = 'none';
+}
+
+async function excluirProduto(id, nome) {
+  if (!confirm(`Excluir o produto "${nome}"?\n\nSe ele já possui perdas ou produções registradas, não será possível excluir — use "Editar" e mude a situação para Inativo.`)) return;
+  try {
+    const res  = await fetch(`/api/produtos/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) { alert(data.erro); return; }
+    renderProdutos(document.getElementById('conteudo'));
+  } catch (err) {
+    alert('Erro ao excluir: ' + err.message);
+  }
 }

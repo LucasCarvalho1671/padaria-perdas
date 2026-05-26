@@ -24,4 +24,8 @@ async function atualizar(id, { nome, ativo }) {
   return rows[0] || null;
 }
 
-module.exports = { criar, listar, atualizar };
+async function excluir(id) {
+  await db.query(`DELETE FROM motivos WHERE id = $1`, [id]);
+}
+
+module.exports = { criar, listar, atualizar, excluir };

@@ -94,7 +94,8 @@ const dbUsuarios = require('../db/usuarios');
 // ============================================================
 router.get('/produtos', autenticar, async (req, res) => {
   try {
-    const lista = await dbProdutos.listar();
+    const apenasAtivos = req.query.todos !== 'true';
+    const lista = await dbProdutos.listar(apenasAtivos);
     res.json(lista);
   } catch (err) { erroInterno(res, err, 'GET /produtos'); }
 });
@@ -116,12 +117,25 @@ router.put('/produtos/:id', autenticar, async (req, res) => {
   } catch (err) { erroInterno(res, err, 'PUT /produtos'); }
 });
 
+router.delete('/produtos/:id', autenticar, async (req, res) => {
+  try {
+    await dbProdutos.excluir(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({ erro: 'Este produto possui perdas ou produções registradas e não pode ser excluído. Use "Inativar" para ocultá-lo.' });
+    }
+    erroInterno(res, err, 'DELETE /produtos');
+  }
+});
+
 // ============================================================
 // MOTIVOS
 // ============================================================
 router.get('/motivos', autenticar, async (req, res) => {
   try {
-    const lista = await dbMotivos.listar();
+    const apenasAtivos = req.query.todos !== 'true';
+    const lista = await dbMotivos.listar(apenasAtivos);
     res.json(lista);
   } catch (err) { erroInterno(res, err, 'GET /motivos'); }
 });
@@ -141,6 +155,18 @@ router.put('/motivos/:id', autenticar, async (req, res) => {
     if (!motivo) return res.status(404).json({ erro: 'Motivo não encontrado.' });
     res.json(motivo);
   } catch (err) { erroInterno(res, err, 'PUT /motivos'); }
+});
+
+router.delete('/motivos/:id', autenticar, async (req, res) => {
+  try {
+    await dbMotivos.excluir(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({ erro: 'Este motivo está vinculado a perdas registradas e não pode ser excluído. Use "Inativar" para ocultá-lo.' });
+    }
+    erroInterno(res, err, 'DELETE /motivos');
+  }
 });
 
 // ============================================================
@@ -336,6 +362,11 @@ router.put('/usuarios/:id', autenticar, async (req, res) => {
   try {
     const usuario = await dbUsuarios.atualizar(req.params.id, req.body);
     if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+    // Atualiza a senha se enviada (opcional)
+    if (req.body.senha && req.body.senha.length >= 6) {
+      const hash = await bcrypt.hash(req.body.senha, 10);
+      await dbUsuarios.atualizarSenha(req.params.id, hash);
+    }
     res.json(usuario);
   } catch (err) { erroInterno(res, err, 'PUT /usuarios'); }
 });
