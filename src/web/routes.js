@@ -371,6 +371,18 @@ router.post('/usuarios', autenticar, async (req, res) => {
   }
 });
 
+router.delete('/usuarios/:id', autenticar, async (req, res) => {
+  try {
+    await dbUsuarios.excluir(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({ erro: 'Este usuário possui perdas ou produções registradas e não pode ser excluído. Use "Editar → Inativo" para desativá-lo.' });
+    }
+    erroInterno(res, err, 'DELETE /usuarios');
+  }
+});
+
 router.put('/usuarios/:id', autenticar, async (req, res) => {
   try {
     const usuario = await dbUsuarios.atualizar(req.params.id, req.body);

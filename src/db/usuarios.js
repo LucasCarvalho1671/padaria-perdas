@@ -44,4 +44,8 @@ async function atualizarSenha(id, senhaNova) {
   await db.query(`UPDATE usuarios SET senha = $1 WHERE id = $2`, [senhaNova, id]);
 }
 
-module.exports = { criar, buscarPorEmail, buscarPorId, listar, atualizar, atualizarSenha };
+async function excluir(id) {
+  await db.query(`DELETE FROM usuarios WHERE id = $1`, [id]);
+}
+
+module.exports = { criar, buscarPorEmail, buscarPorId, listar, atualizar, atualizarSenha, excluir };

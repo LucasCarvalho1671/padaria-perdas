@@ -108,10 +108,14 @@ async function renderConfiguracoes(el) {
                   <td>${u.email}</td>
                   <td><span class="badge badge-cinza">${u.role}</span></td>
                   <td><span class="badge ${u.ativo ? 'badge-verde' : 'badge-cinza'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
-                  <td>
+                  <td style="white-space:nowrap">
                     <button class="btn btn-secundario btn-sm"
                       onclick="abrirEdicaoUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.role}', ${u.ativo})">
                       ✏️ Editar
+                    </button>
+                    <button class="btn btn-perigo btn-sm"
+                      onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">
+                      🗑️ Excluir
                     </button>
                   </td>
                 </tr>`).join('')}
@@ -305,6 +309,24 @@ function abrirEdicaoMotivo(id, nome, ativo) {
 
 function fecharModalMotivo() {
   document.getElementById('modal-motivo').style.display = 'none';
+}
+
+// ── Excluir usuário ──────────────────────────────────────────
+async function excluirUsuario(id, nome) {
+  const ok = await confirmar(
+    `Excluir o usuário <strong>"${nome}"</strong>?<br><br>
+     Se ele já registrou perdas ou produções, não será possível excluir — use <strong>Editar → Inativo</strong> em vez disso.`,
+    { okTexto: '🗑️ Excluir', okClasse: 'btn-perigo' }
+  );
+  if (!ok) return;
+  try {
+    const res  = await fetch(`/api/usuarios/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) { await alertar(data.erro); return; }
+    renderConfiguracoes(document.getElementById('conteudo'));
+  } catch (err) {
+    await alertar('Erro ao excluir: ' + err.message);
+  }
 }
 
 // ── Excluir motivo ───────────────────────────────────────────
