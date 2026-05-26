@@ -77,8 +77,8 @@ function gerarCSV(colunas, linhas) {
       ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header = colunas.map(escapar).join(',');
-  const corpo  = linhas.map(l => colunas.map(c => escapar(l[c])).join(',')).join('\n');
-  return '﻿' + header + '\n' + corpo; // ﻿ = BOM para Excel reconhecer UTF-8
+  const corpo  = linhas.map(l => colunas.map(c => escapar(l[c])).join(',')).join('\r\n');
+  return '﻿' + header + '\r\n' + corpo; // BOM + CRLF para Excel reconhecer UTF-8 e quebrar linhas
 }
 const { autenticar } = require('./auth');
 const { erroInterno } = require('../utils/helpers');
