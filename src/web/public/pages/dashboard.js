@@ -1,7 +1,7 @@
-async function renderDashboard(el) {
+async function renderDashboard(el, secao = 'padaria') {
   el.innerHTML = '<div class="carregando">Carregando dashboard...</div>';
   try {
-    const res  = await fetch('/api/dashboard');
+    const res  = await fetch(`/api/dashboard?secao=${secao}`);
     const data = await res.json();
     const { resumo, topProdutos, porMotivo, comparativo } = data;
 
@@ -10,42 +10,60 @@ async function renderDashboard(el) {
     const moeda = (v) => v == null ? '—' :
       'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
+    // ── Datas úteis para os filtros ───────────────────────────
+    const hoje         = new Date().toISOString().split('T')[0];
+    const inicioMes    = hoje.slice(0, 8) + '01';
+    const fimMes       = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+                           .toISOString().split('T')[0];
+    const d7 = new Date(); d7.setDate(d7.getDate() - 6);
+    const inicioSemana = d7.toISOString().split('T')[0];
+
     el.innerHTML = `
-      <!-- Resumo rápido -->
+      <!-- ── Resumo rápido ── -->
       <div class="grid-resumo">
-        <div class="card-resumo">
+        <div class="card-resumo card-resumo-link"
+             onclick="irParaHistorico({dataInicio:'${inicioMes}',dataFim:'${fimMes}'},'${secao}')"
+             title="Ver perdas do mês no histórico">
           <div class="label">Perdas no mês</div>
           <div class="valor">${resumo.registros_mes}</div>
-          <div class="sub">registros</div>
+          <div class="sub">registros · ver detalhes →</div>
         </div>
-        <div class="card-resumo">
+        <div class="card-resumo card-resumo-link"
+             onclick="irParaHistorico({dataInicio:'${inicioMes}',dataFim:'${fimMes}'},'${secao}')"
+             title="Ver perdas do mês no histórico">
           <div class="label">Valor perdido (mês)</div>
-          <div class="valor" style="font-size:1.2rem">${moeda(resumo.valor_mes)}</div>
-          <div class="sub">calculado</div>
+          <div class="valor">${moeda(resumo.valor_mes)}</div>
+          <div class="sub">calculado · ver detalhes →</div>
         </div>
-        <div class="card-resumo">
+        <div class="card-resumo card-resumo-link"
+             onclick="irParaHistorico({dataInicio:'${inicioSemana}',dataFim:'${hoje}'},'${secao}')"
+             title="Ver perdas dos últimos 7 dias no histórico">
           <div class="label">Perdas na semana</div>
           <div class="valor">${resumo.registros_semana}</div>
-          <div class="sub">${moeda(resumo.valor_semana)}</div>
+          <div class="sub">${moeda(resumo.valor_semana)} · ver detalhes →</div>
         </div>
-        <div class="card-resumo">
+        <div class="card-resumo card-resumo-link"
+             onclick="irParaHistorico({},'${secao}')"
+             title="Ver todo o histórico de perdas">
           <div class="label">Total histórico</div>
           <div class="valor">${resumo.total_registros}</div>
-          <div class="sub">registros</div>
+          <div class="sub">registros · ver todos →</div>
         </div>
       </div>
 
       <div class="grid-2">
         <!-- Top produtos com mais perda -->
         <div class="card">
-          <div class="secao-titulo">🥖 Mais perdidos este mês</div>
+          <div class="secao-titulo">${secao === 'acougue' ? '🥩' : '🥖'} Mais perdidos este mês</div>
           ${topProdutos.length === 0
             ? '<div class="vazio">Nenhuma perda registrada.</div>'
             : `<table>
                 <thead><tr><th>Produto</th><th>Qtd</th><th>Valor</th></tr></thead>
                 <tbody>
                   ${topProdutos.map(p => `
-                    <tr>
+                    <tr class="linha-clicavel"
+                        onclick="irParaHistorico({dataInicio:'${inicioMes}',dataFim:'${fimMes}',produto_id:'${p.produto_id}'},'${secao}')"
+                        title="Ver perdas deste produto no mês">
                       <td>
                         ${p.imagem_url ? `<img src="${p.imagem_url}" class="produto-thumb" />` : ''}
                         ${p.nome}
@@ -66,7 +84,9 @@ async function renderDashboard(el) {
                 <thead><tr><th>Motivo</th><th>Qtd</th><th>Valor</th></tr></thead>
                 <tbody>
                   ${porMotivo.map(m => `
-                    <tr>
+                    <tr class="linha-clicavel"
+                        onclick="irParaHistorico({dataInicio:'${inicioMes}',dataFim:'${fimMes}',motivo_id:'${m.motivo_id}'},'${secao}')"
+                        title="Ver perdas deste motivo no mês">
                       <td>${m.nome}</td>
                       <td>${m.total_registros}</td>
                       <td>${moeda(m.total_valor)}</td>
@@ -88,7 +108,9 @@ async function renderDashboard(el) {
                 </tr></thead>
                 <tbody>
                   ${comparativo.map(c => `
-                    <tr>
+                    <tr class="linha-clicavel"
+                        onclick="irParaHistorico({dataInicio:'${inicioMes}',dataFim:'${fimMes}',produto_id:'${c.id}'},'${secao}')"
+                        title="Ver histórico de perdas deste produto no mês">
                       <td>
                         ${c.imagem_url ? `<img src="${c.imagem_url}" class="produto-thumb" />` : ''}
                         ${c.nome} <small style="color:#999">(${c.unidade})</small>
@@ -111,4 +133,10 @@ async function renderDashboard(el) {
   } catch (err) {
     el.innerHTML = `<div class="alerta alerta-erro">Erro ao carregar dashboard: ${err.message}</div>`;
   }
+}
+
+// ── Navega para o histórico com filtros pré-aplicados ─────────
+function irParaHistorico(filtros, secao) {
+  window._historicoFiltros = filtros;
+  navegar(secao === 'acougue' ? '/acougue/historico' : '/historico');
 }

@@ -18,14 +18,7 @@
       <span class="sidebar-titulo">Padaria Perdas</span>
       <button class="sidebar-fechar" id="btn-fechar-menu">✕</button>
     </div>
-    <ul class="sidebar-menu">
-      <li><a href="/" data-page="dashboard"     class="menu-item">📊 Dashboard</a></li>
-      <li><a href="/perdas" data-page="perdas"   class="menu-item">📋 Registrar Perda</a></li>
-      <li><a href="/producao" data-page="producao" class="menu-item">🏭 Produção</a></li>
-      <li><a href="/historico" data-page="historico" class="menu-item">📂 Histórico</a></li>
-      <li data-admin><a href="/produtos" data-page="produtos"  class="menu-item">🥖 Produtos</a></li>
-      <li data-admin><a href="/configuracoes" data-page="configuracoes" class="menu-item">⚙️ Configurações</a></li>
-    </ul>
+    <ul class="sidebar-menu" id="sidebar-menu"></ul>
     <div class="sidebar-footer">
       <span id="sidebar-usuario"></span>
       <button class="btn-logout" id="btn-logout">Sair</button>
@@ -46,7 +39,38 @@
     </main>
   </div>
 
+  <script>
+    // ── Permissões padrão (espelho do backend — mantê-los sincronizados) ──
+    window.PERMISSOES_PADRAO = {
+      ver_dashboard:      true,
+      ver_historico:      true,
+      registrar_perda:    true,
+      registrar_producao: true,
+      editar_perda:       false,
+      excluir_perda:      false,
+      editar_producao:    false,
+      excluir_producao:   false,
+      exportar_relatorio: true,
+      cadastrar_produto:  false,
+      editar_produto:     false,
+      excluir_produto:    false,
+      gerenciar_motivos:  false,
+      gerenciar_usuarios: false,
+    };
+
+    // Retorna true se o usuário logado tem a permissão solicitada.
+    // Admin sempre retorna true. Para funcionários, usa as permissões
+    // efetivas já mescladas que vêm do endpoint /api/auth/me.
+    function temPermissao(perm) {
+      const u = window.usuarioAtual;
+      if (!u) return false;
+      if (u.role === 'admin') return true;
+      // permissoes já vem mesclado com PADRAO do /me endpoint
+      return !!(u.permissoes?.[perm] ?? window.PERMISSOES_PADRAO[perm]);
+    }
+  </script>
   <script src="/dialogs.js"></script>
+  <script src="/combobox.js"></script>
   <script src="/router.js"></script>
   <script src="/pages/dashboard.js"></script>
   <script src="/pages/perdas.js"></script>
@@ -55,7 +79,69 @@
   <script src="/pages/produtos.js"></script>
   <script src="/pages/configuracoes.js"></script>
   <script>
-    // ── Verificar autenticação ──────────────────────────────
+    // ── Gera o menu lateral com base no acesso e permissões ─────
+    function gerarMenu(usuario) {
+      const menu    = document.getElementById('sidebar-menu');
+      const isAdmin = usuario.role === 'admin';
+      const acesso  = usuario.acesso || 'ambos';
+
+      // ── Título do sidebar muda conforme o acesso ──────────────
+      const logos   = { padaria: '🍞', acougue: '🥩', ambos: '🍞' };
+      const titulos = { padaria: 'Padaria Perdas', acougue: 'Açougue Perdas', ambos: 'Padaria Perdas' };
+      document.querySelector('.sidebar-logo').textContent   = logos[acesso]   || '🍞';
+      document.querySelector('.sidebar-titulo').textContent = titulos[acesso] || 'Padaria Perdas';
+
+      // Verifica se o usuário tem acesso à página de produtos
+      const podeVrProdutos = isAdmin
+        || temPermissao('cadastrar_produto')
+        || temPermissao('editar_produto')
+        || temPermissao('excluir_produto');
+
+      // Verifica se o usuário pode ver configurações
+      const podeVrConfig = isAdmin
+        || temPermissao('gerenciar_motivos')
+        || temPermissao('gerenciar_usuarios');
+
+      const itensPadaria = `
+        ${temPermissao('ver_dashboard')      ? `<li><a href="/" data-page="dashboard" class="menu-item">📊 Dashboard</a></li>` : ''}
+        ${temPermissao('registrar_perda')    ? `<li><a href="/perdas" data-page="perdas" class="menu-item">📋 Registrar Perda</a></li>` : ''}
+        ${temPermissao('registrar_producao') ? `<li><a href="/producao" data-page="producao" class="menu-item">🏭 Produção</a></li>` : ''}
+        ${temPermissao('ver_historico')      ? `<li><a href="/historico" data-page="historico" class="menu-item">📂 Histórico</a></li>` : ''}
+        ${podeVrProdutos ? `<li><a href="/produtos" data-page="produtos" class="menu-item">🥖 Produtos</a></li>` : ''}
+      `;
+
+      const itensAcougue = `
+        ${temPermissao('ver_dashboard')      ? `<li><a href="/acougue" data-page="acougue-dashboard" class="menu-item">📊 Dashboard</a></li>` : ''}
+        ${temPermissao('registrar_perda')    ? `<li><a href="/acougue/perdas" data-page="acougue-perdas" class="menu-item">📋 Registrar Perda</a></li>` : ''}
+        ${temPermissao('registrar_producao') ? `<li><a href="/acougue/producao" data-page="acougue-producao" class="menu-item">🏭 Produção</a></li>` : ''}
+        ${temPermissao('ver_historico')      ? `<li><a href="/acougue/historico" data-page="acougue-historico" class="menu-item">📂 Histórico</a></li>` : ''}
+        ${podeVrProdutos ? `<li><a href="/acougue/produtos" data-page="acougue-produtos" class="menu-item">🥩 Produtos</a></li>` : ''}
+      `;
+
+      // Configurações — admin ou usuário com permissão de gestão
+      const itemConfig = podeVrConfig ? `
+        <li class="menu-secao-titulo menu-secao-geral">Geral</li>
+        <li><a href="/configuracoes" data-page="configuracoes" class="menu-item">⚙️ Configurações</a></li>
+      ` : '';
+
+      if (acesso === 'padaria') {
+        menu.innerHTML = itensPadaria + itemConfig;
+      } else if (acesso === 'acougue') {
+        menu.innerHTML = itensAcougue + itemConfig;
+      } else { // 'ambos'
+        menu.innerHTML = `
+          ${itensPadaria}
+          <li class="menu-secao-header">
+            <span class="menu-secao-header-logo">🥩</span>
+            <span class="menu-secao-header-nome">Açougue Perdas</span>
+          </li>
+          ${itensAcougue}
+          ${itemConfig}
+        `;
+      }
+    }
+
+    // ── Verificar autenticação ──────────────────────────────────
     (async () => {
       try {
         const res = await fetch('/api/auth/me');
@@ -64,11 +150,7 @@
         window.usuarioAtual = usuario; // disponível globalmente para as páginas
         document.getElementById('sidebar-usuario').textContent = usuario.nome;
 
-        // Esconde itens de menu exclusivos de admin para funcionários
-        if (usuario.role !== 'admin') {
-          document.querySelectorAll('[data-admin]').forEach(el => el.style.display = 'none');
-        }
-
+        gerarMenu(usuario);  // constrói o menu antes de initRouter
         initRouter();
       } catch {
         window.location.href = '/login.html';
@@ -93,6 +175,17 @@
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = '/login.html';
     };
+
+    // ── Placeholder para imagens de produto que não carregam ──
+    document.addEventListener('error', function(e) {
+      const img = e.target;
+      if (img.tagName === 'IMG' && img.classList.contains('produto-thumb')) {
+        const span = document.createElement('span');
+        span.className = 'produto-thumb produto-thumb-vazio';
+        span.textContent = '📷';
+        img.parentNode.replaceChild(span, img);
+      }
+    }, true); // capture=true para pegar erros de imagens inseridas dinamicamente
   </script>
 </body>
 </html>

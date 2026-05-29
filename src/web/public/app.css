@@ -90,6 +90,61 @@ body {
   background: var(--cor-primaria);
   color: #fff;
 }
+.menu-secao-titulo {
+  padding: .6rem 1.2rem .2rem;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #888;
+  margin-top: .4rem;
+}
+.menu-secao-geral {
+  margin-top: .8rem;
+  padding-top: .8rem;
+  border-top: 1px solid #333;
+}
+
+/* Mini-header de seção dentro do menu — mesmos valores do .sidebar-header */
+.menu-secao-header {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: 1.2rem 1rem;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+  list-style: none;
+}
+.menu-secao-header-logo { font-size: 1.6rem; }
+.menu-secao-header-nome { font-size: 1rem; font-weight: 700; color: #fff; flex: 1; }
+
+/* ── ABAS (tabs) ──────────────────────────────────────────── */
+.tab-nav {
+  display: flex;
+  gap: .4rem;
+  margin-bottom: 1.2rem;
+  border-bottom: 2px solid var(--cor-borda);
+  padding-bottom: .4rem;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  padding: .45rem .9rem;
+  border-radius: 6px 6px 0 0;
+  font-size: .9rem;
+  cursor: pointer;
+  color: var(--cor-texto-sub);
+  font-weight: 500;
+  transition: background .15s, color .15s;
+}
+.tab-btn:hover {
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+.tab-btn.ativo {
+  background: var(--cor-primaria);
+  color: #fff;
+}
 
 .sidebar-footer {
   padding: 1rem;
@@ -271,6 +326,14 @@ tr:hover td { background: #fafafa; }
   display: inline-block;
   vertical-align: middle;
 }
+/* Placeholder quando a imagem não carrega — mesmas dimensões */
+.produto-thumb-vazio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #ccc;
+}
 
 .badge {
   display: inline-block;
@@ -439,6 +502,29 @@ tr:hover td { background: #fafafa; }
 .img-picker-opcao.selecionada { border-color: var(--cor-primaria); }
 .img-picker-vazio { text-align: center; color: #999; padding: 2rem; font-size: .9rem; }
 
+/* ── CAMPO DE BUSCA dentro do seletor de imagens ────────── */
+.img-picker-busca {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+.img-picker-busca input {
+  flex: 1;
+  padding: .5rem .8rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 6px;
+  font-size: .9rem;
+  font-family: inherit;
+  color: var(--cor-texto);
+  background: white;
+  transition: border-color .15s, box-shadow .15s;
+}
+.img-picker-busca input:focus {
+  outline: none;
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px rgba(200,98,42,.12);
+}
+
 /* ── MOBILE ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar {
@@ -454,6 +540,217 @@ tr:hover td { background: #fafafa; }
   .conteudo       { padding: 1rem; }
   .filtros        { flex-direction: column; }
   .filtros .campo,
-  .filtros .btn   { width: 100%; }
+  .filtros .btn   { width: 100%; min-width: 0; }
+  /* Impede overflow do input de data no iOS e mantém tamanho uniforme */
+  .filtros .campo input[type="date"] {
+    min-width: 0;
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    padding: .6rem .8rem;
+    font-size: .95rem;
+    line-height: 1.5;
+    min-height: 2.7rem;
+  }
+  .filtros .combo-wrap { width: 100%; }
   .perda-layout   { grid-template-columns: 1fr; }
+}
+
+/* ── DASHBOARD MOBILE — alinha os cards reservando altura pro título ── */
+@media (max-width: 768px) {
+  .card-resumo .label { min-height: 2.4rem; }
+}
+
+/* ── COMBOBOX PESQUISÁVEL ─────────────────────────────────── */
+.combo-wrap { position: relative; }
+.combo-input {
+  width: 100%;
+  padding: .55rem .8rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  font-size: .95rem;
+  background: #fff;
+  color: var(--cor-texto);
+  cursor: text;
+  transition: border-color .15s, box-shadow .15s;
+}
+.combo-input:focus {
+  outline: none;
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px rgba(200,98,42,.12);
+}
+.combo-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.13);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 300;
+}
+.combo-dropdown.aberto { display: block; }
+.combo-opcao {
+  padding: .5rem .8rem;
+  cursor: pointer;
+  font-size: .93rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .1s;
+}
+.combo-opcao:hover,
+.combo-opcao.combo-ativa { background: #fff3ec; color: var(--cor-primaria-d); }
+.combo-oculto  { display: none !important; }
+.combo-sep {
+  height: 1px;
+  background: var(--cor-borda);
+  margin: .25rem 0;
+}
+
+/* ── BOTÃO FAVORITO ──────────────────────────────────────── */
+.btn-favorito {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #ccc;
+  padding: .1rem .3rem;
+  line-height: 1;
+  transition: color .15s, transform .1s;
+  vertical-align: middle;
+}
+.btn-favorito:hover  { color: #f0a500; transform: scale(1.2); }
+.btn-favorito.ativo  { color: #f0a500; }
+
+/* ── TOTALIZADOR POR UNIDADE (histórico) ─────────────────── */
+.totalizador {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  padding: .65rem 1rem;
+  margin-bottom: 1rem;
+  background: #fff7f2;
+  border: 1px solid #f0d5c6;
+  border-radius: var(--raio);
+  font-size: .85rem;
+}
+.total-label {
+  font-weight: 600;
+  color: var(--cor-texto-sub);
+}
+.total-sep {
+  color: var(--cor-borda);
+  font-weight: 700;
+}
+.total-chip {
+  background: var(--cor-primaria);
+  color: #fff;
+  padding: .2rem .65rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: .82rem;
+}
+.total-chip--valor {
+  background: var(--cor-sucesso);
+}
+
+/* ── TRÊS PONTOS — botão e dropdown de ações ─────────────── */
+.btn-tres-pontos {
+  background: none;
+  border: 1px solid var(--cor-borda);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: .2rem .55rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--cor-texto-sub);
+  letter-spacing: .05em;
+  transition: background .15s;
+}
+.btn-tres-pontos:hover { background: #f0ece9; }
+
+.dropdown-wrapper { display: inline-block; }
+.dropdown-menu {
+  position: fixed;          /* fixed escapa de qualquer overflow:hidden pai */
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.16);
+  min-width: 165px;
+  padding: .3rem 0;
+  display: none;
+}
+.dropdown-menu.aberto { display: block; }
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: .5rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .9rem;
+  color: var(--cor-texto);
+  white-space: nowrap;
+  transition: background .12s;
+}
+.dropdown-item:hover { background: var(--cor-fundo); }
+.dropdown-item.perigo { color: var(--cor-erro); }
+.dropdown-item.perigo:hover { background: #fff2f2; }
+
+/* ── PERMISSÕES — modal e checkboxes ─────────────────────── */
+.perm-grupo { margin-bottom: 1.1rem; }
+.perm-grupo-titulo {
+  font-weight: 700;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--cor-texto-sub);
+  margin-bottom: .45rem;
+}
+.perm-item {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .3rem 0;
+  cursor: pointer;
+  font-size: .9rem;
+  user-select: none;
+}
+.perm-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--cor-primaria);
+  flex-shrink: 0;
+}
+.perm-separador {
+  border: none;
+  border-top: 1px solid var(--cor-borda);
+  margin: .8rem 0;
+}
+/* ── DASHBOARD — cards e linhas clicáveis ────────────────── */
+.card-resumo-link {
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.card-resumo-link:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.13);
+}
+.card-resumo-link .sub { font-size: .72rem; }
+
+tr.linha-clicavel { cursor: pointer; }
+tr.linha-clicavel:hover td { background: #fff7f2; }
+
+.alerta-info {
+  background: #e8f0fe;
+  color: #1a5fc5;
+  border: 1px solid #c5d8f8;
 }

@@ -1,23 +1,43 @@
 // ── Seletor de imagens global ─────────────────────────────
-// Abre modal com opções de imagem buscadas no Wikipedia + Pixabay
+// Abre modal com campo de busca editável + Wikipedia + Pixabay
 // campoId: id do <input> que vai receber a URL escolhida
 // previewId: id do elemento que mostra o preview
 async function abrirSeletorImagens(nomeProduto, campoId, previewId) {
-  const modal = document.getElementById('img-picker-modal');
-  const grid  = document.getElementById('img-picker-grid');
+  const modal  = document.getElementById('img-picker-modal');
   const titulo = document.getElementById('img-picker-titulo');
+  const input  = document.getElementById('img-picker-q');
 
-  titulo.textContent  = `Escolha uma imagem para: ${nomeProduto}`;
-  grid.innerHTML      = '<div class="img-picker-vazio">🔍 Buscando imagens...</div>';
+  titulo.textContent = `Escolha uma imagem para: ${nomeProduto}`;
+  input.value        = nomeProduto;   // pré-preenche com o nome do produto
+
+  modal._campoId   = campoId;
+  modal._previewId = previewId;
   modal.classList.add('aberto');
 
+  // Foca no input para facilitar edição imediata
+  setTimeout(() => input.focus(), 80);
+
+  await buscarImagensModal();
+}
+
+// Lê o termo atual do input e busca novas imagens
+async function buscarImagensModal() {
+  const grid  = document.getElementById('img-picker-grid');
+  const modal = document.getElementById('img-picker-modal');
+  const termo = document.getElementById('img-picker-q').value.trim();
+
+  if (!termo) return;
+
+  grid.innerHTML = '<div class="img-picker-vazio">🔍 Buscando imagens...</div>';
+
+  const { _campoId: campoId, _previewId: previewId } = modal;
+
   try {
-    const params = new URLSearchParams({ q: nomeProduto });
-    const res    = await fetch(`/api/imagens/buscar?${params}`);
-    const data   = await res.json();
+    const res  = await fetch(`/api/imagens/buscar?q=${encodeURIComponent(termo)}`);
+    const data = await res.json();
 
     if (!data.imagens?.length) {
-      grid.innerHTML = '<div class="img-picker-vazio">Nenhuma imagem encontrada.<br>Tente digitar a URL manualmente.</div>';
+      grid.innerHTML = '<div class="img-picker-vazio">Nenhuma imagem encontrada.<br>Tente outros termos de busca (em inglês funciona melhor).</div>';
       return;
     }
 
@@ -30,10 +50,6 @@ async function abrirSeletorImagens(nomeProduto, campoId, previewId) {
   } catch {
     grid.innerHTML = '<div class="img-picker-vazio">Erro ao buscar imagens. Tente novamente.</div>';
   }
-
-  // Guarda referência para fechar e limpar
-  modal._campoId   = campoId;
-  modal._previewId = previewId;
 }
 
 function selecionarImagem(url, campoId, previewId) {
@@ -56,18 +72,24 @@ function atualizarPreview(url, previewId) {
 }
 
 // ── Tela de Produtos ──────────────────────────────────────
-async function renderProdutos(el) {
+async function renderProdutos(el, secao = 'padaria') {
+  el.dataset.secao = secao;
   el.innerHTML = '<div class="carregando">Carregando...</div>';
   try {
-    const produtos = await fetch('/api/produtos?todos=true').then(r => r.json());
+    const produtos = await fetch(`/api/produtos?todos=true&secao=${secao}`).then(r => r.json());
 
     el.innerHTML = `
       <!-- Modal seletor de imagens -->
       <div id="img-picker-modal" class="img-picker-modal">
         <div class="img-picker-box">
           <div id="img-picker-titulo" class="img-picker-titulo"></div>
+          <div class="img-picker-busca">
+            <input type="text" id="img-picker-q" placeholder="Pesquisar imagens (ex: french bread)..."
+              onkeydown="if(event.key==='Enter'){event.preventDefault();buscarImagensModal()}" />
+            <button class="btn btn-primario btn-sm" onclick="buscarImagensModal()">🔍 Buscar</button>
+          </div>
           <div id="img-picker-grid" class="img-picker-grid"></div>
-          <button class="btn btn-secundario" onclick="fecharSeletorImagens()">Cancelar</button>
+          <button class="btn btn-secundario btn-block" onclick="fecharSeletorImagens()">Cancelar</button>
         </div>
       </div>
 
@@ -126,8 +148,8 @@ async function renderProdutos(el) {
       </div>
 
       <!-- Formulário de cadastro -->
-      <div class="card" style="max-width:560px;margin-bottom:1.5rem">
-        <div class="secao-titulo">🥖 Cadastrar produto</div>
+      ${temPermissao('cadastrar_produto') ? `<div class="card" style="max-width:560px;margin-bottom:1.5rem">` : `<div class="card" style="max-width:560px;margin-bottom:1.5rem;display:none">`}
+        <div class="secao-titulo">${secao === 'acougue' ? '🥩' : '🥖'} Cadastrar produto</div>
         <div id="alerta-prod-cad"></div>
         <form id="form-produto">
           <div class="campo">
@@ -191,14 +213,21 @@ async function renderProdutos(el) {
                       <td>${p.custo ? 'R$ ' + Number(p.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span style="color:#bbb">—</span>'}</td>
                       <td><span class="badge ${p.ativo ? 'badge-verde' : 'badge-cinza'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td>
                       <td>
+                        ${temPermissao('editar_produto') ? `
+                        <button class="btn-favorito ${p.favorito ? 'ativo' : ''}" title="${p.favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}"
+                          onclick="toggleFavorito(${p.id})">
+                          ${p.favorito ? '★' : '☆'}
+                        </button>` : ''}
+                        ${temPermissao('editar_produto') ? `
                         <button class="btn btn-secundario btn-sm"
                           onclick="abrirEdicao(${p.id}, '${p.nome.replace(/'/g, "\\'")}', '${p.unidade}', '${p.custo || ''}', '${(p.imagem_url || '').replace(/'/g, "\\'")}', ${p.ativo})">
                           ✏️ Editar
-                        </button>
+                        </button>` : ''}
+                        ${temPermissao('excluir_produto') ? `
                         <button class="btn btn-perigo btn-sm"
                           onclick="excluirProduto(${p.id}, '${p.nome.replace(/'/g, "\\'")}')">
                           🗑️
-                        </button>
+                        </button>` : ''}
                       </td>
                     </tr>`).join('')}
                 </tbody>
@@ -233,12 +262,13 @@ async function renderProdutos(el) {
             unidade:    document.getElementById('pd-unidade').value,
             custo:      document.getElementById('pd-custo').value || null,
             imagem_url: document.getElementById('pd-imagem').value || null,
+            secao,
           }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.erro);
         alerta.innerHTML = '<div class="alerta alerta-sucesso">✅ Produto cadastrado!</div>';
-        setTimeout(() => renderProdutos(document.getElementById('conteudo')), 1000);
+        setTimeout(() => renderProdutos(document.getElementById('conteudo'), secao), 1000);
       } catch (err) {
         alerta.innerHTML = `<div class="alerta alerta-erro">${err.message}</div>`;
         btn.disabled = false;
@@ -272,7 +302,8 @@ async function renderProdutos(el) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.erro);
         fecharModal();
-        renderProdutos(document.getElementById('conteudo'));
+        const el = document.getElementById('conteudo');
+        renderProdutos(el, el.dataset.secao || 'padaria');
       } catch (err) {
         alerta.innerHTML = `<div class="alerta alerta-erro">${err.message}</div>`;
         btn.disabled = false;
@@ -306,6 +337,12 @@ function fecharModal() {
   document.getElementById('modal-produto').style.display = 'none';
 }
 
+async function toggleFavorito(id) {
+  await fetch(`/api/produtos/${id}/favorito`, { method: 'PATCH' });
+  const el = document.getElementById('conteudo');
+  renderProdutos(el, el.dataset.secao || 'padaria');
+}
+
 async function excluirProduto(id, nome) {
   const ok = await confirmar(
     `Excluir o produto <strong>"${nome}"</strong>?<br><br>
@@ -317,7 +354,8 @@ async function excluirProduto(id, nome) {
     const res  = await fetch(`/api/produtos/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) { await alertar(data.erro); return; }
-    renderProdutos(document.getElementById('conteudo'));
+    const el = document.getElementById('conteudo');
+    renderProdutos(el, el.dataset.secao || 'padaria');
   } catch (err) {
     await alertar('Erro ao excluir: ' + err.message);
   }

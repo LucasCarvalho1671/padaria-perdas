@@ -1,15 +1,15 @@
 const db = require('./index');
 
-async function criar({ produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id }) {
+async function criar({ produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id, secao = 'padaria' }) {
   const { rows } = await db.query(
-    `INSERT INTO perdas (produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [produto_id, motivo_id, quantidade, valor_total || null, data, observacao || null, usuario_id]
+    `INSERT INTO perdas (produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id, secao)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [produto_id, motivo_id, quantidade, valor_total || null, data, observacao || null, usuario_id, secao]
   );
   return rows[0];
 }
 
-async function listar({ dataInicio, dataFim, produto_id, motivo_id } = {}) {
+async function listar({ dataInicio, dataFim, produto_id, motivo_id, secao } = {}) {
   const filtros = ['1=1'];
   const params = [];
 
@@ -17,6 +17,7 @@ async function listar({ dataInicio, dataFim, produto_id, motivo_id } = {}) {
   if (dataFim)    { params.push(dataFim);    filtros.push(`p.data <= $${params.length}`); }
   if (produto_id) { params.push(produto_id); filtros.push(`p.produto_id = $${params.length}`); }
   if (motivo_id)  { params.push(motivo_id);  filtros.push(`p.motivo_id = $${params.length}`); }
+  if (secao)      { params.push(secao);      filtros.push(`p.secao = $${params.length}`); }
 
   const { rows } = await db.query(
     `SELECT
@@ -41,7 +42,20 @@ async function excluir(id) {
   await db.query(`DELETE FROM perdas WHERE id = $1`, [id]);
 }
 
-async function resumoDashboard() {
+async function atualizar(id, { produto_id, motivo_id, quantidade, valor_total, data, observacao }) {
+  const { rows } = await db.query(
+    `UPDATE perdas
+     SET produto_id = $1, motivo_id = $2, quantidade = $3, valor_total = $4,
+         data = $5, observacao = $6
+     WHERE id = $7 RETURNING *`,
+    [produto_id, motivo_id, quantidade, valor_total ?? null, data, observacao || null, id]
+  );
+  return rows[0] || null;
+}
+
+async function resumoDashboard(secao = null) {
+  const params  = [];
+  const where   = secao ? `WHERE secao = $${params.push(secao)}` : '';
   const { rows } = await db.query(`
     SELECT
       COUNT(*)                                         AS total_registros,
@@ -51,14 +65,17 @@ async function resumoDashboard() {
       COALESCE(SUM(valor_total) FILTER (WHERE data >= NOW() - INTERVAL '7 days'), 0) AS valor_semana,
       COUNT(*) FILTER (WHERE data >= DATE_TRUNC('month', NOW())) AS registros_mes,
       COALESCE(SUM(valor_total) FILTER (WHERE data >= DATE_TRUNC('month', NOW())), 0) AS valor_mes
-    FROM perdas
-  `);
+    FROM perdas ${where}
+  `, params);
   return rows[0];
 }
 
-async function topProdutosPerdidos(limite = 5) {
+async function topProdutosPerdidos(limite = 5, secao = null) {
+  const params      = [limite];
+  const secaoFiltro = secao ? `AND p.secao = $${params.push(secao)}` : '';
   const { rows } = await db.query(
     `SELECT
+       pr.id   AS produto_id,
        pr.nome,
        pr.imagem_url,
        SUM(p.quantidade)              AS total_quantidade,
@@ -67,27 +84,48 @@ async function topProdutosPerdidos(limite = 5) {
      FROM perdas p
      JOIN produtos pr ON pr.id = p.produto_id
      WHERE p.data >= DATE_TRUNC('month', NOW())
+     ${secaoFiltro}
      GROUP BY pr.id, pr.nome, pr.imagem_url
      ORDER BY total_quantidade DESC
      LIMIT $1`,
-    [limite]
+    params
   );
   return rows;
 }
 
-async function perdasPorMotivo() {
+async function perdasPorMotivo(secao = null) {
+  const params      = [];
+  const secaoFiltro = secao ? `AND p.secao = $${params.push(secao)}` : '';
   const { rows } = await db.query(`
     SELECT
+      m.id    AS motivo_id,
       m.nome,
       COUNT(*)                        AS total_registros,
       COALESCE(SUM(p.valor_total), 0) AS total_valor
     FROM perdas p
     JOIN motivos m ON m.id = p.motivo_id
     WHERE p.data >= DATE_TRUNC('month', NOW())
+    ${secaoFiltro}
     GROUP BY m.id, m.nome
     ORDER BY total_registros DESC
-  `);
+  `, params);
   return rows;
 }
 
-module.exports = { criar, listar, excluir, resumoDashboard, topProdutosPerdidos, perdasPorMotivo };
+async function recalcularCustos(secao = null) {
+  const params = [];
+  const secaoFiltro = secao ? `AND p.secao = $${params.push(secao)}` : '';
+  const { rowCount } = await db.query(`
+    UPDATE perdas p
+    SET valor_total = CASE
+      WHEN pr.custo IS NOT NULL AND pr.custo > 0 THEN p.quantidade * pr.custo
+      ELSE NULL
+    END
+    FROM produtos pr
+    WHERE p.produto_id = pr.id
+    ${secaoFiltro}
+  `, params);
+  return rowCount;
+}
+
+module.exports = { criar, listar, excluir, atualizar, recalcularCustos, resumoDashboard, topProdutosPerdidos, perdasPorMotivo };
