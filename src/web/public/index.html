@@ -54,8 +54,9 @@
       cadastrar_produto:  false,
       editar_produto:     false,
       excluir_produto:    false,
-      gerenciar_motivos:  false,
-      gerenciar_usuarios: false,
+      gerenciar_motivos:       false,
+      gerenciar_usuarios:      false,
+      gerenciar_funcionarios:  false,
     };
 
     // Retorna true se o usuário logado tem a permissão solicitada.
@@ -73,11 +74,13 @@
   <script src="/combobox.js"></script>
   <script src="/router.js"></script>
   <script src="/pages/dashboard.js"></script>
+  <script src="/pages/dashboard-geral.js"></script>
   <script src="/pages/perdas.js"></script>
   <script src="/pages/producao.js"></script>
   <script src="/pages/historico.js"></script>
   <script src="/pages/produtos.js"></script>
   <script src="/pages/configuracoes.js"></script>
+  <script src="/pages/funcionarios.js"></script>
   <script>
     // ── Gera o menu lateral com base no acesso e permissões ─────
     function gerarMenu(usuario) {
@@ -100,7 +103,8 @@
       // Verifica se o usuário pode ver configurações
       const podeVrConfig = isAdmin
         || temPermissao('gerenciar_motivos')
-        || temPermissao('gerenciar_usuarios');
+        || temPermissao('gerenciar_usuarios')
+        || temPermissao('gerenciar_funcionarios');
 
       const itensPadaria = `
         ${temPermissao('ver_dashboard')      ? `<li><a href="/" data-page="dashboard" class="menu-item">📊 Dashboard</a></li>` : ''}
@@ -130,10 +134,15 @@
         menu.innerHTML = itensAcougue + itemConfig;
       } else { // 'ambos'
         menu.innerHTML = `
+          ${temPermissao('ver_dashboard') ? `<li><a href="/dashboard-geral" data-page="dashboard-geral" class="menu-item">🏠 Visão Geral</a></li>` : ''}
+          <li class="menu-secao-header">
+            <span class="menu-secao-header-logo">🍞</span>
+            <span class="menu-secao-header-nome">Padaria</span>
+          </li>
           ${itensPadaria}
           <li class="menu-secao-header">
             <span class="menu-secao-header-logo">🥩</span>
-            <span class="menu-secao-header-nome">Açougue Perdas</span>
+            <span class="menu-secao-header-nome">Açougue</span>
           </li>
           ${itensAcougue}
           ${itemConfig}

@@ -26,8 +26,9 @@ const PERMISSOES_PADRAO = {
   cadastrar_produto:  false,
   editar_produto:     false,
   excluir_produto:    false,
-  gerenciar_motivos:  false,
-  gerenciar_usuarios: false,
+  gerenciar_motivos:       false,
+  gerenciar_usuarios:      false,
+  gerenciar_funcionarios:  false,
 };
 
 // Middleware: verifica se o usuário está logado

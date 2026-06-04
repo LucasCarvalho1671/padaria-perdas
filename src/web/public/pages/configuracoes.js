@@ -1,9 +1,10 @@
 async function renderConfiguracoes(el) {
   el.innerHTML = '<div class="carregando">Carregando...</div>';
   try {
-    const isAdmin             = window.usuarioAtual?.role === 'admin';
-    const podeGerenciarUsers  = isAdmin || temPermissao('gerenciar_usuarios');
-    const podeGerenciarMotivos = isAdmin || temPermissao('gerenciar_motivos');
+    const isAdmin                  = window.usuarioAtual?.role === 'admin';
+    const podeGerenciarUsers       = isAdmin || temPermissao('gerenciar_usuarios');
+    const podeGerenciarMotivos     = isAdmin || temPermissao('gerenciar_motivos');
+    const podeGerenciarFuncionarios = isAdmin || temPermissao('gerenciar_funcionarios');
 
     const promises = [];
     if (podeGerenciarUsers)   promises.push(fetch('/api/usuarios').then(r => r.json()));
@@ -26,10 +27,15 @@ async function renderConfiguracoes(el) {
     const linhaMotivo = (m) => `
       <tr>
         <td>${m.nome}</td>
+        <td>
+          ${m.cobrar_negligencia
+            ? '<span class="badge badge-vermelho">⚠️ Sim</span>'
+            : '<span class="badge badge-cinza">Não</span>'}
+        </td>
         <td><span class="badge ${m.ativo ? 'badge-verde' : 'badge-cinza'}">${m.ativo ? 'Ativo' : 'Inativo'}</span></td>
         <td style="white-space:nowrap">
           <button class="btn btn-secundario btn-sm"
-            onclick="abrirEdicaoMotivo(${m.id}, '${m.nome.replace(/'/g, "\\'")}', ${m.ativo})">
+            onclick="abrirEdicaoMotivo(${m.id}, '${m.nome.replace(/'/g, "\\'")}', ${m.ativo}, ${!!m.cobrar_negligencia})">
             ✏️ Editar
           </button>
           <button class="btn btn-perigo btn-sm"
@@ -126,6 +132,7 @@ async function renderConfiguracoes(el) {
               <div class="perm-grupo-titulo">⚙️ Configurações</div>
               <label class="perm-item"><input type="checkbox" id="perm-gerenciar_motivos" /> Gerenciar motivos de perda</label>
               <label class="perm-item"><input type="checkbox" id="perm-gerenciar_usuarios" /> Gerenciar usuários</label>
+              <label class="perm-item"><input type="checkbox" id="perm-gerenciar_funcionarios" /> Gerenciar funcionários</label>
             </div>
           </div>
           <div id="alerta-perm" style="margin-top:.5rem"></div>
@@ -154,6 +161,10 @@ async function renderConfiguracoes(el) {
                 <option value="false">Inativo</option>
               </select>
             </div>
+            <label class="perm-item" style="margin-bottom:.75rem">
+              <input type="checkbox" id="em-negligencia" />
+              Cobra por negligência
+            </label>
             <div style="display:flex;gap:.75rem;margin-top:.5rem">
               <button type="submit" class="btn btn-primario" id="btn-salvar-em">Salvar</button>
               <button type="button" class="btn btn-secundario" onclick="fecharModalMotivo()">Cancelar</button>
@@ -230,6 +241,9 @@ async function renderConfiguracoes(el) {
       </div>
       ` : ''}
 
+      <!-- ── Seção Funcionários ── -->
+      <div id="secao-funcionarios"></div>
+
       <!-- ── Seção Manutenção (apenas admin) ── -->
       ${isAdmin ? `
       <div class="card" style="margin-bottom:1.5rem">
@@ -261,20 +275,26 @@ async function renderConfiguracoes(el) {
         <!-- Aba Padaria -->
         <div id="tab-mot-padaria" class="tab-content">
           <div id="alerta-motivo-padaria"></div>
-          <form id="form-motivo-padaria" style="display:flex;gap:.75rem;align-items:flex-end;max-width:480px;margin-bottom:1.5rem">
-            <div class="campo" style="flex:1;margin-bottom:0">
-              <label>Novo motivo — Padaria *</label>
-              <input type="text" id="m-nome-padaria" placeholder="Ex: Produto vencido" required />
+          <form id="form-motivo-padaria" style="max-width:480px;margin-bottom:1.5rem">
+            <div style="display:flex;gap:.75rem;align-items:flex-end">
+              <div class="campo" style="flex:1;margin-bottom:0">
+                <label>Novo motivo — Padaria *</label>
+                <input type="text" id="m-nome-padaria" placeholder="Ex: Produto vencido" required />
+              </div>
+              <button type="submit" class="btn btn-primario" id="btn-salvar-mot-padaria">Adicionar</button>
             </div>
-            <button type="submit" class="btn btn-primario" id="btn-salvar-mot-padaria">Adicionar</button>
+            <label class="perm-item" style="margin-top:.5rem">
+              <input type="checkbox" id="m-negligencia-padaria" />
+              Cobra por negligência
+            </label>
           </form>
           <div class="tabela-wrapper">
             <table>
-              <thead><tr><th>Motivo</th><th>Situação</th><th></th></tr></thead>
+              <thead><tr><th>Motivo</th><th>Cobrança</th><th>Situação</th><th></th></tr></thead>
               <tbody>
                 ${motivosPadaria.length
                   ? motivosPadaria.map(linhaMotivo).join('')
-                  : '<tr><td colspan="3" class="vazio">Nenhum motivo cadastrado.</td></tr>'}
+                  : '<tr><td colspan="4" class="vazio">Nenhum motivo cadastrado.</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -283,20 +303,26 @@ async function renderConfiguracoes(el) {
         <!-- Aba Açougue -->
         <div id="tab-mot-acougue" class="tab-content" style="display:none">
           <div id="alerta-motivo-acougue"></div>
-          <form id="form-motivo-acougue" style="display:flex;gap:.75rem;align-items:flex-end;max-width:480px;margin-bottom:1.5rem">
-            <div class="campo" style="flex:1;margin-bottom:0">
-              <label>Novo motivo — Açougue *</label>
-              <input type="text" id="m-nome-acougue" placeholder="Ex: Carne fora do prazo" required />
+          <form id="form-motivo-acougue" style="max-width:480px;margin-bottom:1.5rem">
+            <div style="display:flex;gap:.75rem;align-items:flex-end">
+              <div class="campo" style="flex:1;margin-bottom:0">
+                <label>Novo motivo — Açougue *</label>
+                <input type="text" id="m-nome-acougue" placeholder="Ex: Carne fora do prazo" required />
+              </div>
+              <button type="submit" class="btn btn-primario" id="btn-salvar-mot-acougue">Adicionar</button>
             </div>
-            <button type="submit" class="btn btn-primario" id="btn-salvar-mot-acougue">Adicionar</button>
+            <label class="perm-item" style="margin-top:.5rem">
+              <input type="checkbox" id="m-negligencia-acougue" />
+              Cobra por negligência
+            </label>
           </form>
           <div class="tabela-wrapper">
             <table>
-              <thead><tr><th>Motivo</th><th>Situação</th><th></th></tr></thead>
+              <thead><tr><th>Motivo</th><th>Cobrança</th><th>Situação</th><th></th></tr></thead>
               <tbody>
                 ${motivosAcougue.length
                   ? motivosAcougue.map(linhaMotivo).join('')
-                  : '<tr><td colspan="3" class="vazio">Nenhum motivo cadastrado.</td></tr>'}
+                  : '<tr><td colspan="4" class="vazio">Nenhum motivo cadastrado.</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -393,7 +419,8 @@ async function renderConfiguracoes(el) {
             const res = await fetch('/api/motivos', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                nome:  document.getElementById(`m-nome-${secao}`).value,
+                nome:               document.getElementById(`m-nome-${secao}`).value,
+                cobrar_negligencia: document.getElementById(`m-negligencia-${secao}`)?.checked || false,
                 secao,
               }),
             });
@@ -485,11 +512,13 @@ async function renderConfiguracoes(el) {
       btn.textContent = 'Salvando...';
       try {
         const id  = document.getElementById('em-id').value;
+        const cbx = document.getElementById('em-negligencia');
         const res = await fetch(`/api/motivos/${id}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nome:  document.getElementById('em-nome').value,
-            ativo: document.getElementById('em-ativo').value === 'true',
+            nome:               document.getElementById('em-nome').value,
+            ativo:              document.getElementById('em-ativo').value === 'true',
+            cobrar_negligencia: cbx ? cbx.checked : false,
           }),
         });
         const data = await res.json();
@@ -502,6 +531,15 @@ async function renderConfiguracoes(el) {
         btn.textContent = 'Salvar';
       }
     });
+
+    // ── Seção funcionários (por último — não pode quebrar os listeners acima) ──
+    if (podeGerenciarFuncionarios) {
+      try {
+        await renderSecaoFuncionarios(document.getElementById('secao-funcionarios'));
+      } catch (err) {
+        console.error('Erro ao carregar seção de funcionários:', err);
+      }
+    }
 
   } catch (err) {
     el.innerHTML = `<div class="alerta alerta-erro">Erro: ${err.message}</div>`;
@@ -626,10 +664,11 @@ function fecharModalPermissoes() {
 }
 
 // ── Motivo: abrir/fechar modal ───────────────────────────────────
-function abrirEdicaoMotivo(id, nome, ativo) {
+function abrirEdicaoMotivo(id, nome, ativo, cobrarNegligencia) {
   document.getElementById('em-id').value    = id;
   document.getElementById('em-nome').value  = nome;
   document.getElementById('em-ativo').value = ativo ? 'true' : 'false';
+  document.getElementById('em-negligencia').checked = !!cobrarNegligencia;
   document.getElementById('alerta-edit-motivo').innerHTML = '';
   document.getElementById('btn-salvar-em').disabled    = false;
   document.getElementById('btn-salvar-em').textContent = 'Salvar';

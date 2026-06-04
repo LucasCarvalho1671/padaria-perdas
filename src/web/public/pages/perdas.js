@@ -1,14 +1,17 @@
-async function renderPerdas(el) {
+async function renderPerdas(el, secao = 'padaria') {
   el.innerHTML = '<div class="carregando">Carregando...</div>';
   try {
-    const [produtos, motivos] = await Promise.all([
-      fetch('/api/produtos').then(r => r.json()),
-      fetch('/api/motivos').then(r => r.json()),
+    const [produtos, motivos, funcionarios] = await Promise.all([
+      fetch(`/api/produtos?secao=${secao}`).then(r => r.json()),
+      fetch(`/api/motivos?secao=${secao}`).then(r => r.json()),
+      fetch(`/api/funcionarios?secao=${secao}`).then(r => r.json()),
     ]);
 
-    // Mapa rápido: id → produto completo
+    // Mapas rápidos
     const mapaProdutos = {};
     produtos.forEach(p => { mapaProdutos[p.id] = p; });
+    const mapaMotivos = {};
+    motivos.forEach(m => { mapaMotivos[m.id] = m; });
 
     el.innerHTML = `
       <div class="perda-layout">
@@ -20,10 +23,11 @@ async function renderPerdas(el) {
           <form id="form-perda">
             <div class="campo">
               <label>Produto *</label>
-              <select id="p-produto" required>
-                <option value="">Selecione o produto...</option>
-                ${produtos.map(p => `<option value="${p.id}">${p.nome} (${p.unidade})</option>`).join('')}
-              </select>
+              ${htmlCombobox('p-produto', 'Digite para pesquisar...', [
+                ...produtos.filter(p => p.favorito).map(p => ({ value: p.id, label: `★ ${p.nome} (${p.unidade})` })),
+                ...(produtos.some(p => p.favorito) && produtos.some(p => !p.favorito) ? [{ disabled: true }] : []),
+                ...produtos.filter(p => !p.favorito).map(p => ({ value: p.id, label: `${p.nome} (${p.unidade})` })),
+              ])}
             </div>
             <div class="campo">
               <label>Motivo *</label>
@@ -44,6 +48,23 @@ async function renderPerdas(el) {
               <label>Observação</label>
               <textarea id="p-obs" placeholder="Opcional..."></textarea>
             </div>
+
+            <!-- ── Seção de cobrança por negligência (oculta por padrão) ── -->
+            <div id="secao-cobranca" style="display:none;background:#fff7f2;border:1px solid #f0d5c6;border-radius:8px;padding:.9rem;margin-bottom:1rem">
+              <div style="font-weight:600;color:var(--cor-primaria);margin-bottom:.75rem">⚠️ Este motivo gera cobrança por negligência</div>
+              <div class="campo">
+                <label>Funcionário responsável *</label>
+                <select id="p-funcionario">
+                  <option value="">Selecione o funcionário...</option>
+                  ${funcionarios.map(f => `<option value="${f.id}">${f.nome}${f.funcao ? ` — ${f.funcao}` : ''}</option>`).join('')}
+                </select>
+              </div>
+              <div class="campo" style="margin-bottom:0">
+                <label>Valor cobrado (R$)</label>
+                <input type="number" id="p-valor-cobrado" min="0" step="0.01" placeholder="Calculado automaticamente ou informe manualmente" />
+              </div>
+            </div>
+
             <button type="submit" class="btn btn-primario btn-block" id="btn-salvar-perda">
               Registrar Perda
             </button>
@@ -61,6 +82,37 @@ async function renderPerdas(el) {
       </div>
     `;
 
+    ativarComboboxes();
+
+    // ── Mostra/oculta seção de cobrança ao trocar motivo ────
+    const atualizarCobranca = () => {
+      const motivoId  = document.getElementById('p-motivo').value;
+      const motivo    = mapaMotivos[motivoId];
+      const secaoDiv  = document.getElementById('secao-cobranca');
+      secaoDiv.style.display = motivo?.cobrar_negligencia ? '' : 'none';
+      if (!motivo?.cobrar_negligencia) {
+        document.getElementById('p-funcionario').value    = '';
+        document.getElementById('p-valor-cobrado').value  = '';
+      } else {
+        calcularValorCobrado();
+      }
+    };
+
+    const calcularValorCobrado = () => {
+      const produtoId = document.getElementById('p-produto').value;
+      const qtd       = parseFloat(document.getElementById('p-quantidade').value) || 0;
+      const produto   = mapaProdutos[produtoId];
+      if (produto?.valor_cobranca && qtd > 0) {
+        document.getElementById('p-valor-cobrado').value =
+          (produto.valor_cobranca * qtd).toFixed(2);
+      }
+    };
+
+    document.getElementById('p-motivo').addEventListener('change', atualizarCobranca);
+    document.getElementById('p-quantidade').addEventListener('input', () => {
+      if (document.getElementById('secao-cobranca').style.display !== 'none') calcularValorCobrado();
+    });
+
     // ── Atualiza preview ao trocar o produto ─────────────────
     document.getElementById('p-produto').addEventListener('change', (e) => {
       const preview  = document.getElementById('preview-produto');
@@ -74,6 +126,8 @@ async function renderPerdas(el) {
           </div>`;
         return;
       }
+      // Recalcula cobrança ao trocar produto
+      if (document.getElementById('secao-cobranca').style.display !== 'none') calcularValorCobrado();
 
       if (produto.imagem_url) {
         preview.innerHTML = `
@@ -102,16 +156,39 @@ async function renderPerdas(el) {
       btn.disabled = true;
       btn.textContent = 'Salvando...';
 
+      if (!document.getElementById('p-produto').value) {
+        alerta.innerHTML = '<div class="alerta alerta-erro">Selecione um produto da lista.</div>';
+        btn.disabled = false;
+        btn.textContent = 'Registrar Perda';
+        return;
+      }
+
       try {
+        const motivoId    = document.getElementById('p-motivo').value;
+        const cobrar      = mapaMotivos[motivoId]?.cobrar_negligencia;
+        const funcId      = document.getElementById('p-funcionario').value;
+        const valorCobr   = document.getElementById('p-valor-cobrado').value;
+
+        // Valida funcionário se motivo cobra negligência
+        if (cobrar && !funcId) {
+          alerta.innerHTML = '<div class="alerta alerta-erro">Selecione o funcionário responsável.</div>';
+          btn.disabled = false;
+          btn.textContent = 'Registrar Perda';
+          return;
+        }
+
         const res = await fetch('/api/perdas', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            produto_id:  document.getElementById('p-produto').value,
-            motivo_id:   document.getElementById('p-motivo').value,
-            quantidade:  document.getElementById('p-quantidade').value,
-            data:        document.getElementById('p-data').value,
-            observacao:  document.getElementById('p-obs').value,
+            produto_id:              document.getElementById('p-produto').value,
+            motivo_id:               motivoId,
+            quantidade:              document.getElementById('p-quantidade').value,
+            data:                    document.getElementById('p-data').value,
+            observacao:              document.getElementById('p-obs').value,
+            secao,
+            funcionario_cobrado_id:  cobrar && funcId ? funcId : null,
+            valor_cobrado:           cobrar && valorCobr ? valorCobr : null,
           }),
         });
         const data = await res.json();
@@ -120,6 +197,7 @@ async function renderPerdas(el) {
         alerta.innerHTML = '<div class="alerta alerta-sucesso">✅ Perda registrada com sucesso!</div>';
         document.getElementById('form-perda').reset();
         document.getElementById('p-data').value = new Date().toISOString().split('T')[0];
+        document.getElementById('secao-cobranca').style.display = 'none';
 
         // Limpa o preview após salvar
         document.getElementById('preview-produto').innerHTML = `

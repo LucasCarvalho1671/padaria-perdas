@@ -3,7 +3,7 @@
 ## O que é
 Sistema de gestão de perdas para padaria e açougue. Permite registrar produtos perdidos
 (por vencimento, furto, produção errada, etc.), produção diária, gera relatórios
-comparativos e exportação em CSV (Excel).
+comparativos, exportação em CSV e controle de cobranças por negligência.
 
 ## Hospedagem real (produção)
 - **VPS**: 2.25.136.130 (root / Luc@s415241VPS)
@@ -12,8 +12,6 @@ comparativos e exportação em CSV (Excel).
 - **Porta**: 3001 (Nginx faz proxy reverso com SSL)
 - **Banco**: PostgreSQL local na VPS — banco `padaria_db`
 - **Deploy**: `py -3 deploy.py` na raiz do projeto local
-
-> O CLAUDE.md original mencionava Render + Neon — isso foi migrado para VPS própria.
 
 ## Stack
 - **Backend**: Node.js + Express
@@ -31,25 +29,28 @@ app/
     db/
       index.js          → pool de conexão PostgreSQL
       usuarios.js       → queries de usuários + permissões
-      produtos.js       → queries de produtos
-      motivos.js        → queries de motivos de perda
+      produtos.js       → queries de produtos (custo + valor_cobranca)
+      motivos.js        → queries de motivos (cobrar_negligencia)
       perdas.js         → queries de perdas + dashboard + recalcularCustos
       producao.js       → queries de produção + comparativo
+      funcionarios.js   → queries de funcionários cobrados por negligência
     web/
       auth.js           → login/logout + PERMISSOES_PADRAO + verificarPermissao()
       routes.js         → todas as rotas da API (/api/...)
       public/
         index.html      → shell do SPA (após login) + temPermissao() global
         login.html      → tela de login
-        app.css         → estilos globais (inclui mobile)
+        app.css         → estilos globais (inclui mobile, dp-*, dg-*)
         router.js       → roteador client-side com controle de permissões
         pages/
-          dashboard.js  → resumo clicável + navega para histórico com filtros
-          perdas.js     → formulário de registro de perda
-          producao.js   → listagem + edição + exclusão de produção
-          historico.js  → listagem com filtros, edição e exclusão de perdas
-          produtos.js   → cadastro de produtos com imagem
-          configuracoes.js → usuários, motivos, permissões e ferramentas de manutenção
+          dashboard.js       → resumo clicável + navega para histórico com filtros
+          dashboard-geral.js → visão geral lado a lado (padaria + açougue)
+          perdas.js          → formulário de registro de perda + seção de cobrança
+          producao.js        → listagem + edição + exclusão de produção
+          historico.js       → listagem + modal detalhe + edição + exclusão
+          produtos.js        → cadastro de produtos com imagem + valor_cobranca
+          configuracoes.js   → usuários, motivos, funcionários, permissões, manutenção
+          funcionarios.js    → seção de funcionários (chamada pelo configuracoes.js)
     utils/
       helpers.js        → erroInterno()
   sql/
@@ -64,21 +65,49 @@ JWT_SECRET=...
 PORT=3001
 ```
 
-## Sistema de Permissões (14 permissões granulares)
+## Banco de dados — schema completo
 
-### PERMISSOES_PADRAO (auth.js e index.html)
+### Tabelas principais
+```sql
+usuarios     (id, nome, email, senha, role, acesso, ativo, permissoes JSONB, criado_em)
+produtos     (id, nome, unidade, custo, valor_cobranca, imagem_url, favorito, ativo, secao, criado_em)
+motivos      (id, nome, cobrar_negligencia BOOLEAN, ativo, secao, criado_em)
+funcionarios (id, nome, funcao, secao, ativo, criado_em)
+perdas       (id, produto_id, motivo_id, quantidade, valor_total, data, observacao,
+              usuario_id, secao, funcionario_cobrado_id, valor_cobrado, criado_em)
+producao     (id, produto_id, quantidade, data, observacao, usuario_id, secao, criado_em)
+```
+
+### Migrações já aplicadas na VPS
+```sql
+ALTER TABLE usuarios  ADD COLUMN permissoes JSONB;
+ALTER TABLE produtos  ADD COLUMN favorito BOOLEAN DEFAULT FALSE;
+ALTER TABLE produtos  ADD COLUMN secao VARCHAR(20) DEFAULT 'padaria';
+ALTER TABLE produtos  ADD COLUMN valor_cobranca NUMERIC(10,2);
+ALTER TABLE motivos   ADD COLUMN secao VARCHAR(20) DEFAULT 'padaria';
+ALTER TABLE motivos   ADD COLUMN cobrar_negligencia BOOLEAN DEFAULT FALSE;
+ALTER TABLE perdas    ADD COLUMN secao VARCHAR(20) DEFAULT 'padaria';
+ALTER TABLE perdas    ADD COLUMN funcionario_cobrado_id INTEGER REFERENCES funcionarios(id);
+ALTER TABLE perdas    ADD COLUMN valor_cobrado NUMERIC(10,2);
+CREATE TABLE funcionarios (...);
+```
+
+## Sistema de Permissões (15 permissões granulares)
+
+### PERMISSOES_PADRAO (auth.js e index.html — manter sincronizados)
 ```js
 {
-  ver_dashboard: true,       ver_historico: true,
-  registrar_perda: true,     registrar_producao: true,
-  editar_perda: false,       excluir_perda: false,
-  editar_producao: false,    excluir_producao: false,
+  ver_dashboard: true,        ver_historico: true,
+  registrar_perda: true,      registrar_producao: true,
+  editar_perda: false,        excluir_perda: false,
+  editar_producao: false,     excluir_producao: false,
   exportar_relatorio: true,
-  cadastrar_produto: false,  editar_produto: false,  excluir_produto: false,
-  gerenciar_motivos: false,  gerenciar_usuarios: false,
+  cadastrar_produto: false,   editar_produto: false,   excluir_produto: false,
+  gerenciar_motivos: false,   gerenciar_usuarios: false,
+  gerenciar_funcionarios: false,
 }
 ```
-- Coluna `permissoes` JSONB na tabela `usuarios` (migrado na VPS)
+- Coluna `permissoes` JSONB na tabela `usuarios`
 - Admin sempre passa — `verificarPermissao()` só verifica funcionários
 - `temPermissao(perm)` global no frontend (via `window.usuarioAtual`)
 - JWT inclui permissões efetivas (padrão + overrides do usuário)
@@ -98,6 +127,10 @@ PORT=3001
 | POST | /api/motivos | gerenciar_motivos | Criar motivo |
 | PUT  | /api/motivos/:id | gerenciar_motivos | Editar motivo |
 | DELETE | /api/motivos/:id | gerenciar_motivos | Excluir motivo |
+| GET  | /api/funcionarios | autenticar | Listar funcionários |
+| POST | /api/funcionarios | gerenciar_funcionarios | Criar funcionário |
+| PUT  | /api/funcionarios/:id | gerenciar_funcionarios | Editar funcionário |
+| DELETE | /api/funcionarios/:id | gerenciar_funcionarios | Excluir funcionário |
 | POST | /api/perdas | autenticar | Registrar perda |
 | GET  | /api/perdas | autenticar | Listar perdas (filtros) |
 | PUT  | /api/perdas/:id | editar_perda | Editar perda |
@@ -118,51 +151,87 @@ PORT=3001
 
 ## Funcionalidades implementadas
 
-### Dashboard
+### Dashboard Geral (`/dashboard-geral`)
+- Tela inicial para usuários com `acesso: 'ambos'` + `ver_dashboard`
+- Duas colunas sempre lado a lado (padaria | açougue), inclusive no mobile
+- Cada coluna: header clicável → dashboard individual, 4 mini-cards, top produtos, por motivo
+- Cada mini-card: ícone no canto → dashboard individual; corpo → histórico filtrado
+- `acessoRequerido: 'ambos'` na rota — usuários com só padaria ou só açougue são bloqueados
+
+### Dashboard individual
 - 4 cards clicáveis (perdas do mês, valor perdido, semana, total histórico)
-- Tabelas clicáveis: top produtos perdidos, perdas por motivo, comparativo produção × perda
-- Clicar navega para Histórico com filtros pré-aplicados via `window._historicoFiltros`
+- Tabelas clicáveis: top produtos, por motivo, comparativo produção × perda
+- Navegação para histórico com filtros via `window._historicoFiltros`
 
 ### Histórico de perdas
-- Filtros: data início/fim, produto (combobox pesquisável), motivo
-- Totalizador: N registros · X kg · Y unid · R$ Z (valor em verde)
-- Edição inline via modal (requer permissão `editar_perda`)
-- Exclusão (requer permissão `excluir_perda`)
-- Exportar CSV (requer permissão `exportar_relatorio`)
+- Filtros: data início/fim, produto (combobox), motivo, cobrado de (funcionário)
+- Totalizador: N registros · X kg · R$ valor · ⚠️ R$ cobrado (chip vermelho)
+- **Tabela simplificada**: Data, Produto, Qtd, Valor, Motivo (badge ⚠️ se tem cobrança)
+- **Clicar na linha** → modal de detalhe completo (imagem, todos os campos, cobrança, obs.)
+- Editar/excluir: na tabela E no modal de detalhe (apenas para quem tem permissão)
+- Exportar CSV (requer `exportar_relatorio`)
+
+### Registrar Perda
+- Seção de cobrança por negligência (aparece automaticamente quando motivo tem flag)
+- Seleciona funcionário responsável + valor cobrado (calculado por `produto.valor_cobranca × qtd`)
+- Validação: funcionário obrigatório quando motivo cobra negligência
 
 ### Produção
 - Listagem com filtros, edição e exclusão por permissão
 - Exportar CSV
 
 ### Produtos
+- `custo` → valor para cálculo de `valor_total` da perda
+- `valor_cobranca` → valor cobrado do funcionário por negligência (pode ser diferente do custo)
 - Cadastro com busca automática de imagem (Wikipedia → Google → Pixabay)
 - Toggle favorito (aparecem primeiro nos filtros com ★)
-- Inativar em vez de excluir quando há registros vinculados
 
-### Configurações (admin/permissão)
-- **Usuários**: cadastrar, editar, ativar/inativar, excluir
-- **Permissões**: modal com 14 checkboxes por usuário (só admin)
-- **Motivos**: separados por aba (Padaria / Açougue)
+### Configurações
+- **Usuários**: cadastrar, editar, ativar/inativar, excluir, dropdown ⋯ com `position:fixed`
+- **Permissões**: modal com 15 checkboxes por usuário (só admin)
+- **Motivos**: separados por aba (Padaria / Açougue) + flag "Cobra por negligência"
+  - Badge `⚠️ cobra` na tabela de motivos quando flag ativa
+- **👷 Funcionários**: cadastrar/editar/inativar/excluir funcionários cobráveis
+  - Tabela com Nome, Cargo, Seção, Situação
+  - Independentes dos usuários do sistema (não têm login)
 - **Ferramentas de manutenção** (só admin):
-  - Recalcular custos de perdas — atualiza `valor_total` com base no custo atual do produto
-  - Produto sem custo → limpa o valor (NULL); com custo → recalcula
+  - Recalcular custos: atualiza `valor_total` e `valor_cobrado` com base nos custos atuais
+  - Produto sem custo → limpa o valor (NULL)
 
 ### Seções Padaria / Açougue
 - Todos os cadastros têm campo `secao` ('padaria' ou 'acougue')
-- Rotas separadas no router: /historico vs /acougue/historico, etc.
+- Rotas separadas: `/historico` vs `/acougue/historico`, etc.
+- Funcionários filtrados por seção na tela de registro de perda
 
 ## Padrões importantes
 
-### Dropdown de 3 pontos (configuracoes.js)
-- `position: fixed` + `getBoundingClientRect()` para escapar de overflow:hidden
-- Abre para cima se menos de 120px disponíveis abaixo
+### Roteamento
+```js
+rotaDefault():
+  acesso='ambos' + ver_dashboard → '/dashboard-geral'
+  acesso='acougue'               → '/acougue'
+  default                        → '/'
+
+podeAcessarRota(rota):
+  admin → sempre passa
+  rota.acessoRequerido && u.acesso !== rota.acessoRequerido → bloqueia
+  rota.permissoes → verifica temPermissao()
+```
 
 ### Navegação dashboard → histórico
 ```js
 window._historicoFiltros = { dataInicio, dataFim, produto_id, motivo_id };
 navegar('/historico'); // ou /acougue/historico
-// historico.js lê e limpa window._historicoFiltros no início do render
+// historico.js lê e limpa _historicoFiltros no início do render
 ```
+
+### Cobrança por negligência — fluxo completo
+1. Motivo marcado com `cobrar_negligencia = true` em Configurações
+2. Produto com `valor_cobranca` cadastrado em Produtos
+3. Ao registrar perda: seção laranja aparece → seleciona funcionário → valor calculado automaticamente
+4. `perdas.funcionario_cobrado_id` + `perdas.valor_cobrado` salvos no banco
+5. Histórico: badge ⚠️ na linha + detalhes no modal de detalhe
+6. Filtro "Cobrado de" no histórico (por funcionário ou "apenas com cobrança")
 
 ### Recálculo de custos (SQL)
 ```sql
@@ -176,8 +245,24 @@ WHERE p.produto_id = pr.id
 [AND p.secao = $1]
 ```
 
+### Inicialização do configuracoes.js
+- `renderSecaoFuncionarios` é chamado por ÚLTIMO (após todos os listeners)
+- Envolto em try/catch para não quebrar o resto se falhar
+- Ordem importante: tabs → add usuario → bindFormMotivo → save usuario → save permissoes → save motivo → **renderSecaoFuncionarios**
+
 ## Mobile (app.css)
 - Sidebar deslizante com overlay
 - Filtros em coluna com `width: 100%`
-- `input[type="date"]` com `-webkit-appearance: none` + padding explícito + `min-height: 2.7rem` para evitar overflow no iOS e manter tamanho uniforme vazio/preenchido
-- Cards do dashboard: `.card-resumo .label { min-height: 2.4rem }` para alinhar os valores mesmo quando o título ocupa 2 linhas
+- `input[type="date"]` com `-webkit-appearance: none` + padding explícito + `min-height: 2.7rem`
+- Cards do dashboard: `.card-resumo .label { min-height: 2.4rem }` para alinhar títulos
+- Dashboard geral: `.dg-mini-grid { grid-template-columns: 1fr }` no mobile (cards empilhados)
+
+## Deploy — arquivos monitorados
+Todos os arquivos abaixo estão em `deploy.py`. Se criar arquivo novo, adicionar lá:
+```
+src/db/: usuarios, funcionarios, motivos, perdas, producao, produtos
+src/web/: auth, routes
+src/web/public/: index.html, app.css, router.js
+src/web/public/pages/: configuracoes, funcionarios, dashboard, dashboard-geral,
+                        perdas, historico, producao, produtos
+```

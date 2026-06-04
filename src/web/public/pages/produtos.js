@@ -118,8 +118,12 @@ async function renderProdutos(el, secao = 'padaria') {
               </select>
             </div>
             <div class="campo">
-              <label>Custo unitário (R$) <small style="color:#999">— opcional</small></label>
+              <label>Custo unitário (R$) <small style="color:#999">— para cálculo do valor da perda</small></label>
               <input type="number" id="edit-custo" min="0" step="0.01" placeholder="Ex: 0.80" />
+            </div>
+            <div class="campo">
+              <label>Valor de cobrança por negligência (R$) <small style="color:#999">— opcional</small></label>
+              <input type="number" id="edit-valor-cobranca" min="0" step="0.01" placeholder="Ex: 2.50" />
             </div>
             <div class="campo">
               <label>Imagem de referência</label>
@@ -170,8 +174,12 @@ async function renderProdutos(el, secao = 'padaria') {
             </select>
           </div>
           <div class="campo">
-            <label>Custo unitário (R$) <small style="color:#999">— opcional</small></label>
+            <label>Custo unitário (R$) <small style="color:#999">— para cálculo do valor da perda</small></label>
             <input type="number" id="pd-custo" min="0" step="0.01" placeholder="Ex: 0.80" />
+          </div>
+          <div class="campo">
+            <label>Valor de cobrança por negligência (R$) <small style="color:#999">— opcional</small></label>
+            <input type="number" id="pd-valor-cobranca" min="0" step="0.01" placeholder="Ex: 2.50" />
           </div>
           <div class="campo">
             <label>Imagem de referência <small style="color:#999">— opcional</small></label>
@@ -198,7 +206,7 @@ async function renderProdutos(el, secao = 'padaria') {
             ? '<div class="vazio">Nenhum produto cadastrado.</div>'
             : `<table>
                 <thead>
-                  <tr><th></th><th>Nome</th><th>Unidade</th><th>Custo</th><th>Situação</th><th></th></tr>
+                  <tr><th></th><th>Nome</th><th>Unidade</th><th>Custo</th><th>Vlr. cobrança</th><th>Situação</th><th></th></tr>
                 </thead>
                 <tbody>
                   ${produtos.map(p => `
@@ -211,6 +219,7 @@ async function renderProdutos(el, secao = 'padaria') {
                       <td>${p.nome}</td>
                       <td>${p.unidade}</td>
                       <td>${p.custo ? 'R$ ' + Number(p.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span style="color:#bbb">—</span>'}</td>
+                      <td>${p.valor_cobranca ? 'R$ ' + Number(p.valor_cobranca).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span style="color:#bbb">—</span>'}</td>
                       <td><span class="badge ${p.ativo ? 'badge-verde' : 'badge-cinza'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td>
                       <td>
                         ${temPermissao('editar_produto') ? `
@@ -220,7 +229,7 @@ async function renderProdutos(el, secao = 'padaria') {
                         </button>` : ''}
                         ${temPermissao('editar_produto') ? `
                         <button class="btn btn-secundario btn-sm"
-                          onclick="abrirEdicao(${p.id}, '${p.nome.replace(/'/g, "\\'")}', '${p.unidade}', '${p.custo || ''}', '${(p.imagem_url || '').replace(/'/g, "\\'")}', ${p.ativo})">
+                          onclick="abrirEdicao(${p.id}, '${p.nome.replace(/'/g, "\\'")}', '${p.unidade}', '${p.custo || ''}', '${p.valor_cobranca || ''}', '${(p.imagem_url || '').replace(/'/g, "\\'")}', ${p.ativo})">
                           ✏️ Editar
                         </button>` : ''}
                         ${temPermissao('excluir_produto') ? `
@@ -258,10 +267,11 @@ async function renderProdutos(el, secao = 'padaria') {
         const res = await fetch('/api/produtos', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nome:       document.getElementById('pd-nome').value,
-            unidade:    document.getElementById('pd-unidade').value,
-            custo:      document.getElementById('pd-custo').value || null,
-            imagem_url: document.getElementById('pd-imagem').value || null,
+            nome:            document.getElementById('pd-nome').value,
+            unidade:         document.getElementById('pd-unidade').value,
+            custo:           document.getElementById('pd-custo').value || null,
+            valor_cobranca:  document.getElementById('pd-valor-cobranca').value || null,
+            imagem_url:      document.getElementById('pd-imagem').value || null,
             secao,
           }),
         });
@@ -292,11 +302,12 @@ async function renderProdutos(el, secao = 'padaria') {
         const res = await fetch(`/api/produtos/${id}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nome:       document.getElementById('edit-nome').value,
-            unidade:    document.getElementById('edit-unidade').value,
-            custo:      document.getElementById('edit-custo').value || null,
-            imagem_url: document.getElementById('edit-imagem').value || null,
-            ativo:      document.getElementById('edit-ativo').value === 'true',
+            nome:           document.getElementById('edit-nome').value,
+            unidade:        document.getElementById('edit-unidade').value,
+            custo:          document.getElementById('edit-custo').value || null,
+            valor_cobranca: document.getElementById('edit-valor-cobranca').value || null,
+            imagem_url:     document.getElementById('edit-imagem').value || null,
+            ativo:          document.getElementById('edit-ativo').value === 'true',
           }),
         });
         const data = await res.json();
@@ -317,13 +328,14 @@ async function renderProdutos(el, secao = 'padaria') {
 }
 
 // ── Abre modal de edição preenchido ──────────────────────
-function abrirEdicao(id, nome, unidade, custo, imagem_url, ativo) {
-  document.getElementById('edit-id').value      = id;
-  document.getElementById('edit-nome').value    = nome;
-  document.getElementById('edit-unidade').value = unidade;
-  document.getElementById('edit-custo').value   = custo || '';
-  document.getElementById('edit-imagem').value  = imagem_url || '';
-  document.getElementById('edit-ativo').value   = ativo ? 'true' : 'false';
+function abrirEdicao(id, nome, unidade, custo, valor_cobranca, imagem_url, ativo) {
+  document.getElementById('edit-id').value              = id;
+  document.getElementById('edit-nome').value            = nome;
+  document.getElementById('edit-unidade').value         = unidade;
+  document.getElementById('edit-custo').value           = custo || '';
+  document.getElementById('edit-valor-cobranca').value  = valor_cobranca || '';
+  document.getElementById('edit-imagem').value          = imagem_url || '';
+  document.getElementById('edit-ativo').value           = ativo ? 'true' : 'false';
   document.getElementById('alerta-edit').innerHTML = '';
   atualizarPreview(imagem_url, 'edit-preview');
 

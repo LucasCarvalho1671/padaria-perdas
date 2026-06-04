@@ -161,11 +161,12 @@ function gerarCSV(colunas, linhas) {
 const { autenticar, apenasAdmin, verificarPermissao } = require('./auth');
 const { erroInterno } = require('../utils/helpers');
 
-const dbProdutos = require('../db/produtos');
-const dbMotivos  = require('../db/motivos');
-const dbPerdas   = require('../db/perdas');
-const dbProducao = require('../db/producao');
-const dbUsuarios = require('../db/usuarios');
+const dbProdutos     = require('../db/produtos');
+const dbMotivos      = require('../db/motivos');
+const dbPerdas       = require('../db/perdas');
+const dbProducao     = require('../db/producao');
+const dbUsuarios     = require('../db/usuarios');
+const dbFuncionarios = require('../db/funcionarios');
 
 // ============================================================
 // PRODUTOS
@@ -181,16 +182,17 @@ router.get('/produtos', autenticar, async (req, res) => {
 
 router.post('/produtos', autenticar, verificarPermissao('cadastrar_produto'), async (req, res) => {
   try {
-    const { nome, unidade, custo, imagem_url, secao } = req.body;
+    const { nome, unidade, custo, valor_cobranca, imagem_url, secao } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
-    const produto = await dbProdutos.criar({ nome, unidade, custo, imagem_url, secao });
+    const produto = await dbProdutos.criar({ nome, unidade, custo, valor_cobranca, imagem_url, secao });
     res.status(201).json(produto);
   } catch (err) { erroInterno(res, err, 'POST /produtos'); }
 });
 
 router.put('/produtos/:id', autenticar, verificarPermissao('editar_produto'), async (req, res) => {
   try {
-    const produto = await dbProdutos.atualizar(req.params.id, req.body);
+    const { nome, unidade, custo, valor_cobranca, imagem_url, ativo } = req.body;
+    const produto = await dbProdutos.atualizar(req.params.id, { nome, unidade, custo, valor_cobranca, imagem_url, ativo });
     if (!produto) return res.status(404).json({ erro: 'Produto não encontrado.' });
     res.json(produto);
   } catch (err) { erroInterno(res, err, 'PUT /produtos'); }
@@ -230,16 +232,17 @@ router.get('/motivos', autenticar, async (req, res) => {
 
 router.post('/motivos', autenticar, verificarPermissao('gerenciar_motivos'), async (req, res) => {
   try {
-    const { nome, secao } = req.body;
+    const { nome, secao, cobrar_negligencia } = req.body;
     if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
-    const motivo = await dbMotivos.criar({ nome, secao });
+    const motivo = await dbMotivos.criar({ nome, secao, cobrar_negligencia });
     res.status(201).json(motivo);
   } catch (err) { erroInterno(res, err, 'POST /motivos'); }
 });
 
 router.put('/motivos/:id', autenticar, verificarPermissao('gerenciar_motivos'), async (req, res) => {
   try {
-    const motivo = await dbMotivos.atualizar(req.params.id, req.body);
+    const { nome, ativo, cobrar_negligencia } = req.body;
+    const motivo = await dbMotivos.atualizar(req.params.id, { nome, ativo, cobrar_negligencia });
     if (!motivo) return res.status(404).json({ erro: 'Motivo não encontrado.' });
     res.json(motivo);
   } catch (err) { erroInterno(res, err, 'PUT /motivos'); }
@@ -262,26 +265,25 @@ router.delete('/motivos/:id', autenticar, verificarPermissao('gerenciar_motivos'
 // ============================================================
 router.get('/perdas', autenticar, async (req, res) => {
   try {
-    const { dataInicio, dataFim, produto_id, motivo_id, secao } = req.query;
-    const lista = await dbPerdas.listar({ dataInicio, dataFim, produto_id, motivo_id, secao });
+    const { dataInicio, dataFim, produto_id, motivo_id, secao, funcionario_cobrado_id, apenas_com_cobranca } = req.query;
+    const lista = await dbPerdas.listar({ dataInicio, dataFim, produto_id, motivo_id, secao, funcionario_cobrado_id, apenas_com_cobranca });
     res.json(lista);
   } catch (err) { erroInterno(res, err, 'GET /perdas'); }
 });
 
 router.post('/perdas', autenticar, async (req, res) => {
   try {
-    const { produto_id, motivo_id, quantidade, data, observacao, secao } = req.body;
+    const { produto_id, motivo_id, quantidade, data, observacao, secao, funcionario_cobrado_id, valor_cobrado } = req.body;
     if (!produto_id || !motivo_id || !quantidade || !data) {
       return res.status(400).json({ erro: 'Produto, motivo, quantidade e data são obrigatórios.' });
     }
-
-    // Calcula valor total se o produto tiver custo cadastrado
     const produto = await dbProdutos.buscarPorId(produto_id);
     const valor_total = produto?.custo ? (produto.custo * quantidade) : null;
-
     const perda = await dbPerdas.criar({
       produto_id, motivo_id, quantidade, valor_total,
       data, observacao, usuario_id: req.usuario.id, secao,
+      funcionario_cobrado_id: funcionario_cobrado_id || null,
+      valor_cobrado: valor_cobrado || null,
     });
     res.status(201).json(perda);
   } catch (err) { erroInterno(res, err, 'POST /perdas'); }
@@ -289,13 +291,17 @@ router.post('/perdas', autenticar, async (req, res) => {
 
 router.put('/perdas/:id', autenticar, verificarPermissao('editar_perda'), async (req, res) => {
   try {
-    const { produto_id, motivo_id, quantidade, data, observacao } = req.body;
+    const { produto_id, motivo_id, quantidade, data, observacao, funcionario_cobrado_id, valor_cobrado } = req.body;
     if (!produto_id || !motivo_id || !quantidade || !data) {
       return res.status(400).json({ erro: 'Produto, motivo, quantidade e data são obrigatórios.' });
     }
     const produto = await dbProdutos.buscarPorId(produto_id);
     const valor_total = produto?.custo ? (produto.custo * quantidade) : null;
-    const perda = await dbPerdas.atualizar(req.params.id, { produto_id, motivo_id, quantidade, valor_total, data, observacao });
+    const perda = await dbPerdas.atualizar(req.params.id, {
+      produto_id, motivo_id, quantidade, valor_total, data, observacao,
+      funcionario_cobrado_id: funcionario_cobrado_id || null,
+      valor_cobrado: valor_cobrado || null,
+    });
     if (!perda) return res.status(404).json({ erro: 'Registro não encontrado.' });
     res.json(perda);
   } catch (err) { erroInterno(res, err, 'PUT /perdas'); }
@@ -465,6 +471,46 @@ router.get('/imagens/buscar', autenticar, async (req, res) => {
 
     res.json({ imagens: resultados });
   } catch (err) { erroInterno(res, err, 'GET /imagens/buscar'); }
+});
+
+// ============================================================
+// FUNCIONÁRIOS (cobrados por negligência — sem acesso ao sistema)
+// ============================================================
+router.get('/funcionarios', autenticar, async (req, res) => {
+  try {
+    const { secao, todos } = req.query;
+    const lista = await dbFuncionarios.listar(todos !== 'true', secao || null);
+    res.json(lista);
+  } catch (err) { erroInterno(res, err, 'GET /funcionarios'); }
+});
+
+router.post('/funcionarios', autenticar, verificarPermissao('gerenciar_funcionarios'), async (req, res) => {
+  try {
+    const { nome, funcao, secao } = req.body;
+    if (!nome) return res.status(400).json({ erro: 'Nome é obrigatório.' });
+    const f = await dbFuncionarios.criar({ nome, funcao, secao });
+    res.status(201).json(f);
+  } catch (err) { erroInterno(res, err, 'POST /funcionarios'); }
+});
+
+router.put('/funcionarios/:id', autenticar, verificarPermissao('gerenciar_funcionarios'), async (req, res) => {
+  try {
+    const f = await dbFuncionarios.atualizar(req.params.id, req.body);
+    if (!f) return res.status(404).json({ erro: 'Funcionário não encontrado.' });
+    res.json(f);
+  } catch (err) { erroInterno(res, err, 'PUT /funcionarios'); }
+});
+
+router.delete('/funcionarios/:id', autenticar, verificarPermissao('gerenciar_funcionarios'), async (req, res) => {
+  try {
+    await dbFuncionarios.excluir(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({ erro: 'Este funcionário possui perdas vinculadas e não pode ser excluído. Use "Editar → Inativo".' });
+    }
+    erroInterno(res, err, 'DELETE /funcionarios');
+  }
 });
 
 // ============================================================

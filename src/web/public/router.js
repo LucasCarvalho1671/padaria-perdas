@@ -16,12 +16,18 @@ const rotas = {
   '/acougue/historico': { pagina: 'acougue-historico',  secao: 'acougue', titulo: 'Histórico',       render: (el) => renderHistorico(el,  'acougue') },
   '/acougue/produtos':  { pagina: 'acougue-produtos',   secao: 'acougue', titulo: 'Produtos',        render: (el) => renderProdutos(el,   'acougue'), permissoes: ['cadastrar_produto', 'editar_produto', 'excluir_produto'] },
   // ── Geral ─────────────────────────────────────────────────────
+  '/dashboard-geral':   { pagina: 'dashboard-geral',    secao: 'geral',   titulo: 'Dashboard Geral', render: (el) => renderDashboardGeral(el), permissoes: ['ver_dashboard'], acessoRequerido: 'ambos' },
   '/configuracoes':     { pagina: 'configuracoes',      secao: 'geral',   titulo: 'Configurações',   render: (el) => renderConfiguracoes(el),       permissoes: ['gerenciar_motivos', 'gerenciar_usuarios'] },
 };
 
-// Rota padrão para o acesso do usuário (quem só tem açougue vai para /acougue)
+// Rota padrão para o acesso do usuário
 function rotaDefault() {
-  return window.usuarioAtual?.acesso === 'acougue' ? '/acougue' : '/';
+  const u      = window.usuarioAtual;
+  const acesso = u?.acesso || 'ambos';
+  // Usuário com acesso a ambas seções e permissão de ver dashboard → Dashboard Geral
+  if (acesso === 'ambos' && temPermissao('ver_dashboard')) return '/dashboard-geral';
+  if (acesso === 'acougue') return '/acougue';
+  return '/';
 }
 
 // Verifica se o usuário tem permissão para acessar a rota
@@ -29,6 +35,7 @@ function podeAcessarRota(rota) {
   const u = window.usuarioAtual;
   if (!u) return false;
   if (u.role === 'admin') return true;          // admin passa em tudo
+  if (rota.acessoRequerido && u.acesso !== rota.acessoRequerido) return false; // ex: só 'ambos'
   if (!rota.permissoes) return true;            // rota sem restrição de permissão
   return rota.permissoes.some(p => temPermissao(p)); // precisa de ao menos uma
 }
@@ -90,10 +97,10 @@ function initRouter() {
   // Botão voltar/avançar do navegador
   window.addEventListener('popstate', () => renderPagina(location.pathname));
 
-  // Rota inicial: usuário com acesso somente ao açougue vai direto para /acougue
+  // Rota inicial: redireciona '/' para a rota padrão do usuário
   let inicio = location.pathname;
-  if (inicio === '/' && window.usuarioAtual?.acesso === 'acougue') {
-    inicio = '/acougue';
+  if (inicio === '/') {
+    inicio = rotaDefault();
     history.replaceState({}, '', inicio);
   }
   renderPagina(inicio);

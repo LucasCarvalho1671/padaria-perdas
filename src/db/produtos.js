@@ -1,10 +1,10 @@
 const db = require('./index');
 
-async function criar({ nome, unidade, custo, imagem_url, secao = 'padaria' }) {
+async function criar({ nome, unidade, custo, valor_cobranca, imagem_url, secao = 'padaria' }) {
   const { rows } = await db.query(
-    `INSERT INTO produtos (nome, unidade, custo, imagem_url, secao)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [nome, unidade || 'unidade', custo || null, imagem_url || null, secao]
+    `INSERT INTO produtos (nome, unidade, custo, valor_cobranca, imagem_url, secao)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [nome, unidade || 'unidade', custo || null, valor_cobranca || null, imagem_url || null, secao]
   );
   return rows[0];
 }
@@ -35,11 +35,11 @@ async function buscarPorId(id) {
   return rows[0] || null;
 }
 
-async function atualizar(id, { nome, unidade, custo, imagem_url, ativo }) {
+async function atualizar(id, { nome, unidade, custo, valor_cobranca, imagem_url, ativo }) {
   const { rows } = await db.query(
-    `UPDATE produtos SET nome = $1, unidade = $2, custo = $3, imagem_url = $4, ativo = $5
-     WHERE id = $6 RETURNING *`,
-    [nome, unidade, custo || null, imagem_url || null, ativo, id]
+    `UPDATE produtos SET nome = $1, unidade = $2, custo = $3, valor_cobranca = $4,
+     imagem_url = $5, ativo = $6 WHERE id = $7 RETURNING *`,
+    [nome, unidade, custo || null, valor_cobranca || null, imagem_url || null, ativo, id]
   );
   return rows[0] || null;
 }

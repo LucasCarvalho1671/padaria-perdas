@@ -1,23 +1,25 @@
 const db = require('./index');
 
-async function criar({ produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id, secao = 'padaria' }) {
+async function criar({ produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id, secao = 'padaria', funcionario_cobrado_id, valor_cobrado }) {
   const { rows } = await db.query(
-    `INSERT INTO perdas (produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id, secao)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [produto_id, motivo_id, quantidade, valor_total || null, data, observacao || null, usuario_id, secao]
+    `INSERT INTO perdas (produto_id, motivo_id, quantidade, valor_total, data, observacao, usuario_id, secao, funcionario_cobrado_id, valor_cobrado)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [produto_id, motivo_id, quantidade, valor_total || null, data, observacao || null, usuario_id, secao, funcionario_cobrado_id || null, valor_cobrado || null]
   );
   return rows[0];
 }
 
-async function listar({ dataInicio, dataFim, produto_id, motivo_id, secao } = {}) {
+async function listar({ dataInicio, dataFim, produto_id, motivo_id, secao, funcionario_cobrado_id, apenas_com_cobranca } = {}) {
   const filtros = ['1=1'];
   const params = [];
 
-  if (dataInicio) { params.push(dataInicio); filtros.push(`p.data >= $${params.length}`); }
-  if (dataFim)    { params.push(dataFim);    filtros.push(`p.data <= $${params.length}`); }
-  if (produto_id) { params.push(produto_id); filtros.push(`p.produto_id = $${params.length}`); }
-  if (motivo_id)  { params.push(motivo_id);  filtros.push(`p.motivo_id = $${params.length}`); }
-  if (secao)      { params.push(secao);      filtros.push(`p.secao = $${params.length}`); }
+  if (dataInicio)            { params.push(dataInicio);            filtros.push(`p.data >= $${params.length}`); }
+  if (dataFim)               { params.push(dataFim);               filtros.push(`p.data <= $${params.length}`); }
+  if (produto_id)            { params.push(produto_id);            filtros.push(`p.produto_id = $${params.length}`); }
+  if (motivo_id)             { params.push(motivo_id);             filtros.push(`p.motivo_id = $${params.length}`); }
+  if (secao)                 { params.push(secao);                 filtros.push(`p.secao = $${params.length}`); }
+  if (funcionario_cobrado_id){ params.push(funcionario_cobrado_id);filtros.push(`p.funcionario_cobrado_id = $${params.length}`); }
+  if (apenas_com_cobranca)   { filtros.push(`p.funcionario_cobrado_id IS NOT NULL`); }
 
   const { rows } = await db.query(
     `SELECT
@@ -26,11 +28,13 @@ async function listar({ dataInicio, dataFim, produto_id, motivo_id, secao } = {}
        pr.unidade,
        pr.imagem_url,
        m.nome   AS motivo_nome,
-       u.nome   AS usuario_nome
+       u.nome   AS usuario_nome,
+       f.nome   AS funcionario_cobrado_nome
      FROM perdas p
-     JOIN produtos  pr ON pr.id = p.produto_id
-     JOIN motivos   m  ON m.id  = p.motivo_id
-     JOIN usuarios  u  ON u.id  = p.usuario_id
+     JOIN produtos    pr ON pr.id = p.produto_id
+     JOIN motivos     m  ON m.id  = p.motivo_id
+     JOIN usuarios    u  ON u.id  = p.usuario_id
+     LEFT JOIN funcionarios f ON f.id = p.funcionario_cobrado_id
      WHERE ${filtros.join(' AND ')}
      ORDER BY p.data DESC, p.criado_em DESC`,
     params
@@ -42,13 +46,14 @@ async function excluir(id) {
   await db.query(`DELETE FROM perdas WHERE id = $1`, [id]);
 }
 
-async function atualizar(id, { produto_id, motivo_id, quantidade, valor_total, data, observacao }) {
+async function atualizar(id, { produto_id, motivo_id, quantidade, valor_total, data, observacao, funcionario_cobrado_id, valor_cobrado }) {
   const { rows } = await db.query(
     `UPDATE perdas
      SET produto_id = $1, motivo_id = $2, quantidade = $3, valor_total = $4,
-         data = $5, observacao = $6
-     WHERE id = $7 RETURNING *`,
-    [produto_id, motivo_id, quantidade, valor_total ?? null, data, observacao || null, id]
+         data = $5, observacao = $6, funcionario_cobrado_id = $7, valor_cobrado = $8
+     WHERE id = $9 RETURNING *`,
+    [produto_id, motivo_id, quantidade, valor_total ?? null, data, observacao || null,
+     funcionario_cobrado_id || null, valor_cobrado || null, id]
   );
   return rows[0] || null;
 }

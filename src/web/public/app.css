@@ -541,8 +541,8 @@ tr:hover td { background: #fafafa; }
   .filtros        { flex-direction: column; }
   .filtros .campo,
   .filtros .btn   { width: 100%; min-width: 0; }
-  /* Impede overflow do input de data no iOS e mantém tamanho uniforme */
-  .filtros .campo input[type="date"] {
+  /* Impede overflow do input de data no iOS e mantém tamanho uniforme (todos os campos) */
+  .campo input[type="date"] {
     min-width: 0;
     width: 100%;
     -webkit-appearance: none;
@@ -658,6 +658,9 @@ tr:hover td { background: #fafafa; }
 .total-chip--valor {
   background: var(--cor-sucesso);
 }
+.total-chip--cobrado {
+  background: var(--cor-erro);
+}
 
 /* ── TRÊS PONTOS — botão e dropdown de ações ─────────────── */
 .btn-tres-pontos {
@@ -753,4 +756,172 @@ tr.linha-clicavel:hover td { background: #fff7f2; }
   background: #e8f0fe;
   color: #1a5fc5;
   border: 1px solid #c5d8f8;
+}
+
+/* ── DETALHE DE PERDA — modal de informações ─────────────── */
+.dp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem 1rem;
+  margin-bottom: .75rem;
+}
+.dp-item .dp-label {
+  font-size: .72rem;
+  color: var(--cor-texto-sub);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  margin-bottom: .15rem;
+}
+.dp-item .dp-valor {
+  font-size: .95rem;
+  font-weight: 500;
+  color: var(--cor-texto);
+}
+.dp-cobranca {
+  background: #fff0f0;
+  border: 1px solid #ffd0d0;
+  border-radius: 8px;
+  padding: .75rem;
+  margin-top: .75rem;
+  margin-bottom: .75rem;
+}
+.dp-obs {
+  margin-top: .75rem;
+  padding: .65rem .75rem;
+  background: #f9f9f9;
+  border-radius: 6px;
+  font-size: .9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+@media (max-width: 480px) {
+  .dp-grid { grid-template-columns: 1fr; }
+}
+
+/* ── DASHBOARD GERAL — duas colunas sempre ───────────────── */
+.dg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  align-items: start;
+}
+.dg-coluna-header {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .5rem .75rem;
+  margin-bottom: .6rem;
+  background: var(--cor-primaria);
+  color: white;
+  border-radius: var(--raio);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: .9rem;
+  user-select: none;
+  transition: background .15s;
+}
+.dg-coluna-header:hover { background: var(--cor-primaria-d); }
+
+.dg-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .4rem;
+  margin-bottom: .6rem;
+}
+.dg-card {
+  background: white;
+  border-radius: 8px;
+  padding: .55rem .5rem .45rem;
+  border-left: 3px solid var(--cor-primaria);
+  box-shadow: var(--sombra);
+  cursor: pointer;
+  position: relative;
+  transition: transform .12s, box-shadow .12s;
+  overflow: hidden;
+}
+.dg-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+.dg-icon-btn {
+  position: absolute;
+  top: .2rem;
+  right: .2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .7rem;
+  padding: .1rem .15rem;
+  border-radius: 3px;
+  opacity: .4;
+  line-height: 1;
+  transition: opacity .12s, background .12s;
+}
+.dg-icon-btn:hover { opacity: 1; background: rgba(0,0,0,.07); }
+.dg-label {
+  font-size: .62rem;
+  color: var(--cor-texto-sub);
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  padding-right: .9rem;
+  line-height: 1.3;
+  margin-bottom: .2rem;
+}
+.dg-valor {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dg-sub {
+  font-size: .6rem;
+  color: var(--cor-texto-sub);
+  margin-top: .1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dg-table-card {
+  background: white;
+  border-radius: var(--raio);
+  padding: .6rem .5rem;
+  box-shadow: var(--sombra);
+  border: 1px solid var(--cor-borda);
+  margin-bottom: .5rem;
+}
+.dg-table-titulo {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--cor-primaria);
+  border-bottom: 2px solid var(--cor-primaria);
+  padding-bottom: .3rem;
+  margin-bottom: .4rem;
+}
+/* Tabelas compactas dentro do dashboard geral */
+.dg-coluna table { font-size: .75rem; }
+.dg-coluna th,
+.dg-coluna td    { padding: .3rem .25rem; }
+.dg-coluna th    { font-size: .65rem; }
+td.dg-td-nome {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mobile — mini-grid em coluna única, tabelas sem coluna de valor */
+@media (max-width: 768px) {
+  .dg-mini-grid        { grid-template-columns: 1fr; }
+  .dg-col-valor        { display: none; }
+  .dg-coluna-header    { font-size: .78rem; padding: .4rem .55rem; }
+  .dg-valor            { font-size: 1rem; }
+  .dg-card             { padding: .4rem .4rem .35rem; }
+  .dg-label            { font-size: .58rem; }
+  td.dg-td-nome        { max-width: 60px; }
+  .dg-grid             { gap: .5rem; }
 }
